@@ -1,0 +1,85 @@
+# Esquema canónico del modelo de riesgo crediticio (dataset Kaggle "Give Me
+# Some Credit"). `source` es el nombre de columna tal como viene en el CSV
+# crudo; la clave (p.ej. `age`) es el nombre canónico que usa el resto de la
+# plataforma (feature store, API, frontend). `label`/`description` alimentan
+# la documentación automática (endpoint /api/v1/features y el formulario de
+# Streamlit) para que quede explícito qué información hay que suministrar.
+target: target_default
+target_source: SeriousDlqin2yrs
+features:
+  revolving_utilization_unsecured:
+    source: RevolvingUtilizationOfUnsecuredLines
+    type: float
+    min: 0.0
+    label: "Utilización de líneas de crédito no garantizadas"
+    description: >-
+      Saldo total en tarjetas de crédito y líneas personales dividido entre
+      la suma de los límites de crédito disponibles.
+  age:
+    source: age
+    type: float
+    min: 18.0
+    max: 120.0
+    label: "Edad"
+    description: "Edad del solicitante, en años."
+  number_of_time_30_59_days_past_due:
+    source: NumberOfTime30-59DaysPastDueNotWorse
+    type: float
+    min: 0.0
+    label: "Atrasos de 30-59 días"
+    description: >-
+      Número de veces que el solicitante se ha atrasado entre 30 y 59 días
+      en los últimos 2 años.
+  debt_ratio:
+    source: DebtRatio
+    type: float
+    min: 0.0
+    label: "Ratio de endeudamiento"
+    description: >-
+      Pagos mensuales de deuda, pensión y gastos de manutención, divididos
+      entre el ingreso bruto mensual.
+  monthly_income:
+    source: MonthlyIncome
+    type: float
+    min: 0.0
+    label: "Ingreso mensual"
+    description: "Ingreso mensual bruto del solicitante."
+  number_open_credit_lines:
+    source: NumberOfOpenCreditLinesAndLoans
+    type: float
+    min: 0.0
+    label: "Líneas de crédito abiertas"
+    description: >-
+      Número de préstamos abiertos (por ejemplo, vehicular o hipotecario) y
+      líneas de crédito abiertas (por ejemplo, tarjetas de crédito).
+  number_of_times_90_days_late:
+    source: NumberOfTimes90DaysLate
+    type: float
+    min: 0.0
+    label: "Atrasos de 90+ días"
+    description: >-
+      Número de veces que el solicitante se ha atrasado 90 días o más.
+  number_real_estate_loans:
+    source: NumberRealEstateLoansOrLines
+    type: float
+    min: 0.0
+    label: "Préstamos hipotecarios"
+    description: >-
+      Número de préstamos hipotecarios y de bienes raíces, incluidas líneas
+      de crédito sobre el valor de la vivienda.
+  number_of_time_60_89_days_past_due:
+    source: NumberOfTime60-89DaysPastDueNotWorse
+    type: float
+    min: 0.0
+    label: "Atrasos de 60-89 días"
+    description: >-
+      Número de veces que el solicitante se ha atrasado entre 60 y 89 días
+      en los últimos 2 años.
+  number_dependents:
+    source: NumberOfDependents
+    type: float
+    min: 0.0
+    label: "Número de dependientes"
+    description: >-
+      Número de dependientes económicos del solicitante (sin contarse a sí
+      mismo).

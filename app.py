@@ -8,17 +8,57 @@ under /api/v1/predict (`src.ml.predict.predict_with_explanation`), so the
 numbers shown here match the API's output. Each input field is labeled and
 annotated with the exact description from `config/data_schema.yaml`, so it
 is always explicit what information is needed to get an evaluation.
+
+On a fresh deployment (e.g. Streamlit Community Cloud) there is no
+pre-trained model artifact committed to the repo (it is gitignored on
+purpose: models do not belong in git history). `_ensure_model()` below
+trains one automatically, once, from the dataset that *is* committed
+(`DATA/GiveMeSomeCredit/`), and caches it for the life of the container so
+this file works as a true "clone and run" demo.
 """
 
 from __future__ import annotations
+
+import os
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
 from src.feature_store.features import load_feature_schema
-from src.ml.predict import ModelNotAvailableError, predict_with_explanation
+from src.ml.predict import (
+    DEFAULT_MODEL_PATH,
+    ModelNotAvailableError,
+    predict_with_explanation,
+)
 
 st.set_page_config(page_title="Credit Risk ML Platform", page_icon="💳", layout="centered")
+
+
+@st.cache_resource(show_spinner="Entrenando el modelo (primera vez en este servidor)...")
+def _ensure_model() -> str:
+    """Train the model on first run if no artifact exists yet, and return its path."""
+    model_path = Path(os.getenv("MODEL_PATH", DEFAULT_MODEL_PATH))
+    if not model_path.is_file():
+        from src.data_pipeline.ingest import download_give_me_some_credit
+        from src.data_pipeline.validate import (
+            clean_out_of_range_rows,
+            validate_input_data,
+        )
+        from src.ml.train import train_model
+
+        data_dir = download_give_me_some_credit()
+        csv_files = sorted(Path(data_dir).glob("cs-training.csv")) or sorted(
+            Path(data_dir).glob("*.csv")
+        )
+        raw_data = pd.read_csv(csv_files[0], index_col=0)
+        raw_data = clean_out_of_range_rows(raw_data)
+        validate_input_data(raw_data, require_target=True)
+        train_model(raw_data, model_path=model_path, register=False)
+    return str(model_path)
+
+
+MODEL_PATH = _ensure_model()
 
 st.title("💳 Evaluación de riesgo crediticio")
 st.caption(
@@ -66,7 +106,7 @@ with st.form("credit_application"):
 
 if submitted:
     try:
-        result = predict_with_explanation(inputs)
+        result = predict_with_explanation(inputs, model_path=MODEL_PATH)
     except ModelNotAvailableError as error:
         st.error(str(error))
         st.info(

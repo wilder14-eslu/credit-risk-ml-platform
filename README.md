@@ -126,10 +126,13 @@ En Linux/macOS lo mismo aplica cambiando la activación del entorno por
 `source .venv/bin/activate`, o usando los atajos del `Makefile`:
 `make install`, `make train`, `make run`, `make demo`, `make test`, `make lint`.
 
-> **Nota:** tanto la API como la demo necesitan un modelo entrenado en
-> `MODEL_PATH` (por defecto `data/processed/model.joblib`). Si no existe,
-> `/api/v1/predict` responde `503` con un mensaje explicando cómo
-> entrenarlo, y la demo muestra el mismo aviso en pantalla.
+> **Nota:** la API necesita un modelo entrenado en `MODEL_PATH` (por
+> defecto `data/processed/model.joblib`); si no existe, `/api/v1/predict`
+> responde `503` explicando cómo entrenarlo. La demo de Streamlit (`app.py`)
+> es distinta: si no encuentra un modelo lo entrena sola la primera vez
+> (usando el dataset ya incluido en `DATA/GiveMeSomeCredit/`) y lo deja
+> en caché, así que funciona tal cual al desplegarla en Streamlit Community
+> Cloud sin pasos manuales.
 
 ## Todo el stack con Docker Compose
 

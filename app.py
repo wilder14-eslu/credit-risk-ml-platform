@@ -151,3 +151,13 @@ with st.expander("¿Qué información necesito para usar esta demo?"):
         "Estos son exactamente los mismos campos que expone "
         "`GET /api/v1/features` en la API."
     )
+
+with st.expander("Acerca del modelo"):
+    st.markdown(
+        "Esta aplicación utiliza un modelo de riesgo crediticio entrenado "
+        "sobre el dataset **Give Me Some Credit**."
+    )
+    st.link_button(
+        "Documentación API",
+        "https://flotation-quality-prediction.onrender.com/docs",
+    )

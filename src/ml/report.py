@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -128,7 +128,7 @@ def build_report_sections(
     )
     return {
         "title": "Informe de entrenamiento - Credit Risk ML Platform",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "algorithm": result["algorithm"],
         "run_id": result.get("run_id"),
         "narrative": narrative,
@@ -147,8 +147,10 @@ def render_markdown(sections: dict[str, Any]) -> str:
         f"_Generado: {sections['generated_at']}_",
         "",
         f"**Algoritmo:** {sections['algorithm']}  ",
-        f"**Diagnóstico:** {sections['diagnosis']['label']} "
-        f"(brecha train-test: {sections['diagnosis']['gap']})  ",
+        (
+            f"**Diagnóstico:** {sections['diagnosis']['label']} "
+            f"(brecha train-test: {sections['diagnosis']['gap']})  "
+        ),
         f"**Latencia de inferencia:** {sections['latency_ms_per_row']:.3f} ms/solicitante",
         "",
         sections["narrative"],

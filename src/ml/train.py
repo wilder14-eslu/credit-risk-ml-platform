@@ -264,11 +264,11 @@ if __name__ == "__main__":
         top_features = top_feature_importances(trained_model, list(FEATURE_NAMES))
         sections = build_report_sections(result, top_features=top_features)
 
-        from datetime import datetime, timezone
+        from datetime import UTC, datetime
 
         reports_dir = Path("data/processed/reports")
         reports_dir.mkdir(parents=True, exist_ok=True)
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
         md_path = reports_dir / f"training_report_{stamp}.md"
         md_path.write_text(render_markdown(sections), encoding="utf-8")
         print(f"Informe (Markdown) -> {md_path}")

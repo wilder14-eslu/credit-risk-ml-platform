@@ -1,4 +1,10 @@
-from src.ml.report import build_report_sections, render_markdown, top_feature_importances
+from typing import ClassVar
+
+from src.ml.report import (
+    build_report_sections,
+    render_markdown,
+    top_feature_importances,
+)
 
 
 def _fake_train_result() -> dict:
@@ -51,7 +57,7 @@ def test_render_markdown_includes_metrics_and_narrative() -> None:
 
 def test_top_feature_importances_reads_tree_model_attribute() -> None:
     class FakeTreeModel:
-        feature_importances_ = [0.1, 0.5, 0.4]
+        feature_importances_: ClassVar[list[float]] = [0.1, 0.5, 0.4]
 
     result = top_feature_importances(FakeTreeModel(), ["age", "income", "debt_ratio"], top_n=2)
     assert result[0]["feature"] == "income"
@@ -60,10 +66,10 @@ def test_top_feature_importances_reads_tree_model_attribute() -> None:
 
 def test_top_feature_importances_reads_linear_model_coefficients() -> None:
     class FakeLinearModel:
-        coef_ = [[-0.2, 0.9, 0.1]]
+        coef_: ClassVar[list[list[float]]] = [[-0.2, 0.9, 0.1]]
 
     class FakePipeline:
-        named_steps = {"scaler": object(), "model": FakeLinearModel()}
+        named_steps: ClassVar[dict[str, object]] = {"scaler": object(), "model": FakeLinearModel()}
 
     result = top_feature_importances(FakePipeline(), ["age", "income", "debt_ratio"], top_n=1)
     assert result[0]["feature"] == "income"

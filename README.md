@@ -1,5 +1,7 @@
 # Credit Risk ML Platform
 
+
+
 Plataforma de evaluación de riesgo crediticio (*default prediction*) de
 extremo a extremo (desde el dato crudo hasta una API y una demo web),
 construida como ejercicio de **MLOps de nivel bancario**: benchmark y
@@ -11,7 +13,7 @@ automático, informes de entrenamiento y CI/CD.
 - **Modelos candidatos:** Regresión Logística (baseline), XGBoost, LightGBM y CatBoost, comparados en cada entrenamiento (`src/ml/benchmark.py`); el ganador se explica con SHAP.
 - **Tracking/registro de modelos:** MLflow.
 - **API:** FastAPI.
-- **Demo interactiva:** Streamlit (incluye panel de monitoreo).
+- **Demo interactiva:** Streamlit (incluye panel de monitoreo) : https://credit-risk-ml-platform-xk4rsvntltadpumscgcwko.streamlit.app/
 - **Persistencia:** PostgreSQL (predicciones y resultados reales; esquema en `src/database/init_db.sql`).
 - **Orquestación:** Prefect (`src/orchestrator/pipeline.py` para reentrenar, `src/orchestrator/monitor.py` para monitorear).
 - **CI/CD:** GitHub Actions (`.github/workflows/`), con publicación automática de imágenes Docker en GitHub Container Registry.

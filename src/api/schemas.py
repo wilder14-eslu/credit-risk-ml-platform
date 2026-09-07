@@ -68,3 +68,42 @@ class FeatureField(BaseModel):
 class FeatureSchemaResponse(BaseModel):
     target: str
     fields: list[FeatureField]
+
+
+class OutcomeRequest(BaseModel):
+    """Ground truth reported later for an applicant already scored by
+    /predict -- what a bank's collections/servicing system would send back
+    once the real repayment outcome is known."""
+
+    applicant_id: str = Field(
+        ..., description="Identificador del solicitante, el mismo usado en /predict."
+    )
+    actual_default: bool = Field(
+        ..., description="Si el solicitante efectivamente incumplió."
+    )
+
+
+class OutcomeResponse(BaseModel):
+    status: str = "recorded"
+
+
+class FeatureDrift(BaseModel):
+    psi: dict[str, float]
+    drifted_features: list[str]
+    drift_detected: bool
+    threshold: float
+
+
+class LivePerformance(BaseModel):
+    status: str
+    n_matched: int
+    min_samples: int
+    live_roc_auc: float | None = None
+
+
+class MonitoringStatusResponse(BaseModel):
+    n_predictions: int
+    rate_drift_triggered: bool
+    feature_drift: FeatureDrift | None = None
+    performance: LivePerformance
+    retrain_recommended: bool

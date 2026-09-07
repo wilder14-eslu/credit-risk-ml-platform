@@ -3,7 +3,7 @@
 
 def evaluate_and_promote(
     new_roc_auc: float,
-    model_name: str = "bcp_credit_xgboost",
+    model_name: str = "bcp_credit_champion",
     client=None,
 ) -> bool:
     """Promote a candidate only when it improves over production."""

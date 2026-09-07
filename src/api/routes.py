@@ -1,16 +1,31 @@
 import logging
 
+import pandas as pd
 from fastapi import APIRouter, HTTPException
 
-from src.api.monitoring import record_prediction
+from src.api.monitoring import (
+    compute_live_performance,
+    drift_trigger,
+    load_recent_predictions,
+    record_outcome,
+    record_prediction,
+)
 from src.api.schemas import (
+    FeatureDrift,
     FeatureField,
     FeatureSchemaResponse,
+    LivePerformance,
+    MonitoringStatusResponse,
+    OutcomeRequest,
+    OutcomeResponse,
     PredictionRequest,
     PredictionResponse,
 )
+from src.database.connection import session_factory
+from src.database.repository import persist_outcome, persist_prediction
 from src.feature_store.features import load_feature_schema
 from src.ml.predict import ModelNotAvailableError, predict_with_explanation
+from src.monitoring.drift import compute_feature_drift, load_reference_distribution
 
 logger = logging.getLogger(__name__)
 
@@ -52,9 +67,22 @@ async def predict(request: PredictionRequest) -> PredictionResponse:
         raise HTTPException(status_code=503, detail=str(error)) from error
 
     try:
-        record_prediction(payload, result["probability"], result["decision"])
+        record_prediction(
+            payload,
+            result["probability"],
+            result["decision"],
+            applicant_id=request.applicant_id,
+        )
     except Exception:  # pragma: no cover - logging must never break a prediction
         logger.exception("No se pudo registrar la predicción para monitoreo.")
+
+    await persist_prediction(
+        session_factory,
+        request.applicant_id,
+        result["probability"],
+        result["decision"],
+        result.get("top_factors"),
+    )
 
     return PredictionResponse(
         applicant_id=request.applicant_id,
@@ -62,4 +90,57 @@ async def predict(request: PredictionRequest) -> PredictionResponse:
         decision=result["decision"],
         risk_band=result["risk_band"],
         top_factors=result.get("top_factors", []),
+    )
+
+
+@router.post("/outcomes", response_model=OutcomeResponse)
+async def submit_outcome(request: OutcomeRequest) -> OutcomeResponse:
+    """Report the real-world result for an applicant scored earlier.
+
+    This is what feeds `compute_live_performance`: without it the platform
+    can only see input drift, never whether the model is actually still
+    accurate.
+    """
+    try:
+        record_outcome(request.applicant_id, request.actual_default)
+    except Exception:  # pragma: no cover - logging must never break the request
+        logger.exception("No se pudo registrar el resultado real para monitoreo.")
+
+    await persist_outcome(session_factory, request.applicant_id, request.actual_default)
+    return OutcomeResponse()
+
+
+@router.get("/monitoring/status", response_model=MonitoringStatusResponse)
+async def monitoring_status() -> MonitoringStatusResponse:
+    """Current drift/performance signals and whether they'd trigger a retrain.
+
+    Same checks `src.orchestrator.monitor.monitoring_flow` runs on a
+    schedule, exposed here so any external dashboard (or a human) can see
+    the platform's monitoring state without reading the JSONL logs directly.
+    """
+    predictions = load_recent_predictions()
+    probabilities = [event["probability"] for event in predictions]
+    rate_triggered = drift_trigger(probabilities)
+
+    feature_drift_payload: FeatureDrift | None = None
+    try:
+        reference = load_reference_distribution()
+    except FileNotFoundError:
+        pass
+    else:
+        recent_features = pd.DataFrame([event["features"] for event in predictions])
+        feature_drift_payload = FeatureDrift(**compute_feature_drift(recent_features, reference))
+
+    performance = compute_live_performance()
+
+    retrain_recommended = rate_triggered or bool(
+        feature_drift_payload and feature_drift_payload.drift_detected
+    )
+
+    return MonitoringStatusResponse(
+        n_predictions=len(predictions),
+        rate_drift_triggered=rate_triggered,
+        feature_drift=feature_drift_payload,
+        performance=LivePerformance(**performance),
+        retrain_recommended=retrain_recommended,
     )

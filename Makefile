@@ -1,4 +1,4 @@
-.PHONY: install train test lint run demo
+.PHONY: install train test lint run demo monitor monitor-once
 
 install:
 	pip install -r requirements.txt
@@ -17,3 +17,9 @@ test:
 
 lint:
 	ruff check .
+
+monitor:
+	python -m src.orchestrator.monitor
+
+monitor-once:
+	python -c "from src.orchestrator.monitor import monitoring_flow; import json; print(json.dumps(monitoring_flow(), indent=2, default=str))"

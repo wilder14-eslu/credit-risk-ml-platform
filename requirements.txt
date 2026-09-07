@@ -36,3 +36,12 @@ kagglehub>=0.2.0
 PyYAML>=6.0.1
 prefect>=3.0.0
 
+# 7. Reportes de entrenamiento
+fpdf2>=2.7.0
+
+# 8. Benchmark de modelos
+lightgbm>=4.0.0
+catboost>=1.2.0
+
+
+

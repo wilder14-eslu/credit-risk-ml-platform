@@ -53,6 +53,22 @@ services:
     depends_on:
       - api
 
+  scheduler:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    env_file:
+      - ../.env
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes:
+      - ../data:/app/data
+    command: ["python", "-m", "src.orchestrator.monitor"]
+    depends_on:
+      - postgres
+      - mlflow
+      - api
+
 volumes:
   postgres_data:
   mlflow_data:

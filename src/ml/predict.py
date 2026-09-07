@@ -2,7 +2,7 @@
 
 Loads the trained model (local joblib artifact by default, or an MLflow
 Model Registry URI when `MLFLOW_MODEL_URI` is set, e.g.
-``models:/bcp_credit_xgboost/Production``) and scores a single applicant
+``models:/bcp_credit_champion/Production``) and scores a single applicant
 using the same canonical feature schema used at training time.
 """
 

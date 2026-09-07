@@ -159,5 +159,5 @@ with st.expander("Acerca del modelo"):
     )
     st.link_button(
         "Documentación API",
-        "https://flotation-quality-prediction.onrender.com/docs",
+        "http://127.0.0.1:8000/docs",
     )

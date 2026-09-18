@@ -6,6 +6,9 @@ install:
 train:
 	python -m src.ml.train
 
+tune:
+	python -m src.ml.tune
+
 run:
 	uvicorn src.api.main:app --reload
 

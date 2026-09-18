@@ -24,6 +24,7 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+import plotly.graph_objects as go
 
 from src.feature_store.features import load_feature_schema
 from src.ml.predict import (
@@ -143,6 +144,10 @@ MODEL_PATH = _ensure_model()
 schema = load_feature_schema()
 fields = schema["features"]
 
+# Inicializar historial de sesión si no existe
+if "history" not in st.session_state:
+    st.session_state.history = []
+
 # --- PANEL LATERAL (SIDEBAR) ---
 with st.sidebar:
     st.title("ℹ️ Acerca de la App")
@@ -161,6 +166,18 @@ with st.sidebar:
             
     st.markdown("---")
     st.link_button("📄 Ver Documentación API (Swagger)", "http://127.0.0.1:8000/docs", use_container_width=True)
+
+    st.markdown("---")
+    st.subheader("🕒 Historial de la Sesión")
+    if not st.session_state.history:
+        st.caption("No hay predicciones recientes.")
+    else:
+        for item in st.session_state.history[:5]:
+            icon_hist = "✅" if item["band"] == "bajo" else "⚠️" if item["band"] == "medio" else "🚨"
+            st.markdown(f"**{item['id']}**<br>{icon_hist} {item['probability']:.1%} - {item['decision'].upper()}", unsafe_allow_html=True)
+        if st.button("Limpiar historial"):
+            st.session_state.history = []
+            st.rerun()
 
 
 # --- INTERFAZ PRINCIPAL ---
@@ -268,6 +285,15 @@ if submitted:
                 
             alert_box(f"**Decisión sugerida:** `{decision.upper()}` | **Nivel de riesgo:** {band.upper()} {icon}")
             
+            # Guardar en el historial de sesión
+            hist_id = applicant_id if applicant_id else f"Anónimo {len(st.session_state.history) + 1}"
+            st.session_state.history.insert(0, {
+                "id": hist_id,
+                "probability": probability,
+                "decision": decision,
+                "band": band
+            })
+            
             col_a, col_b = st.columns([1, 2])
             with col_a:
                 st.metric("Probabilidad de Impago (Default)", f"{probability:.1%}")
@@ -280,14 +306,30 @@ if submitted:
                 st.subheader("🔍 Principales Factores de Riesgo")
                 st.markdown("Las siguientes variables fueron las que más impacto (SHAP) tuvieron en esta decisión:")
                 
-                factors_df = pd.DataFrame(top_factors).set_index("feature")
+                factors_df = pd.DataFrame(top_factors)
+                factors_df = factors_df.sort_values(by="impact", ascending=True)
+                
                 col_chart, col_table = st.columns([2, 1])
                 
                 with col_chart:
-                    st.bar_chart(factors_df["impact"])
+                    fig = go.Figure()
+                    colors = ['#ff4b4b' if x > 0 else '#21c354' for x in factors_df['impact']]
+                    fig.add_trace(go.Bar(
+                        x=factors_df['impact'],
+                        y=factors_df['feature'],
+                        orientation='h',
+                        marker_color=colors
+                    ))
+                    fig.update_layout(
+                        margin=dict(l=0, r=0, t=0, b=0),
+                        xaxis_title="Impacto en la probabilidad (SHAP)",
+                        yaxis_title="",
+                        height=300
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
                 with col_table:
                     st.dataframe(
-                        factors_df.reset_index()[["feature", "value", "impact"]],
+                        factors_df.sort_values(by="impact", ascending=False)[["feature", "value", "impact"]],
                         use_container_width=True,
                         hide_index=True,
                     )

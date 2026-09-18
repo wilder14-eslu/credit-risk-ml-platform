@@ -17,6 +17,7 @@ from src.data_pipeline.ingest import download_give_me_some_credit
 from src.data_pipeline.validate import clean_out_of_range_rows, validate_input_data
 from src.ml.benchmark import comparison_table, run_benchmark, select_best_model
 from src.ml.train import train_model
+from src.ml.tune import optimize_hyperparameters
 from src.ml.validate_model import evaluate_and_promote
 
 
@@ -47,10 +48,16 @@ def benchmark_task(data: pd.DataFrame) -> tuple[str, list[dict]]:
 
 
 @task
-def train_task(data: pd.DataFrame, algorithm: str) -> dict[str, float | str]:
-    """Train (and register) the winning algorithm for real -- this is the
+def tune_task(data: pd.DataFrame, algorithm: str) -> dict:
+    """Tunea los hiperparámetros del algoritmo ganador automáticamente."""
+    return optimize_hyperparameters(data, algorithm=algorithm, n_trials=10)
+
+
+@task
+def train_task(data: pd.DataFrame, algorithm: str, params: dict | None = None) -> dict[str, float | str]:
+    """Train (and register) the winning algorithm for real using the tuned params -- this is the
     run that becomes a candidate in the MLflow Model Registry."""
-    return train_model(data, algorithm=algorithm)
+    return train_model(data, algorithm=algorithm, params=params)
 
 
 @flow(name="credit-risk-continuous-training")
@@ -59,7 +66,9 @@ def retraining_pipeline() -> dict[str, float | str | bool]:
     data = validate_task(data_path)
 
     winner, table = benchmark_task(data)
-    metrics = train_task(data, winner)
+    best_params = tune_task(data, winner)
+    
+    metrics = train_task(data, winner, params=best_params)
 
     promoted = evaluate_and_promote(float(metrics["roc_auc"]))
     return {**metrics, "benchmark": table, "promoted": promoted}

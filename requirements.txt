@@ -30,6 +30,7 @@ ruff>=0.3.0
 
 # 6. Frontend (demo)
 streamlit>=1.32.0
+plotly>=5.18.0
 
 # Data
 kagglehub>=0.2.0
@@ -42,6 +43,7 @@ fpdf2>=2.7.0
 # 8. Benchmark de modelos
 lightgbm>=4.0.0
 catboost>=1.2.0
+optuna>=3.4.0
 
 
 

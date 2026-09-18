@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import pandas as pd
 import streamlit as st
+import plotly.graph_objects as go
 
 from src.api.monitoring import (
     compute_live_performance,
@@ -128,8 +129,30 @@ else:
                 "feature": list(feature_drift["psi"].keys()),
                 "psi": list(feature_drift["psi"].values()),
             }
-        ).set_index("feature")
-        st.bar_chart(psi_df)
+        ).sort_values("psi", ascending=True)
+
+        fig = go.Figure()
+        threshold = feature_drift.get("threshold", 0.2)
+        colors = ['#ff4b4b' if x > threshold else '#3b82f6' for x in psi_df['psi']]
+        
+        fig.add_trace(go.Bar(
+            x=psi_df['psi'],
+            y=psi_df['feature'],
+            orientation='h',
+            marker_color=colors
+        ))
+        
+        fig.add_vline(x=threshold, line_dash="dash", line_color="red", 
+                      annotation_text=f"Umbral ({threshold})", annotation_position="top right")
+
+        fig.update_layout(
+            margin=dict(l=0, r=0, t=20, b=0),
+            xaxis_title="PSI (Population Stability Index)",
+            yaxis_title="",
+            height=max(300, len(psi_df) * 25)
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        
         drifted = ", ".join(feature_drift["drifted_features"]) or "ninguna"
         st.caption(
             f"Umbral de alerta: PSI > {feature_drift['threshold']}. "

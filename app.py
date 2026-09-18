@@ -32,53 +32,156 @@ from src.ml.predict import (
     predict_with_explanation,
 )
 
-st.set_page_config(page_title="Credit Risk ML Platform", page_icon="💳", layout="centered")
+# Configuración inicial de la página con mejor layout
+st.set_page_config(
+    page_title="Credit Risk ML Platform", 
+    page_icon="💳", 
+    layout="centered",
+    initial_sidebar_state="expanded"
+)
+
+# Inyección de CSS personalizado (Fondo, colores y animaciones)
+st.markdown(
+    """
+    <style>
+    /* Fondo con gradiente moderno para la aplicación principal */
+    .stApp {
+        background: linear-gradient(135deg, #f0f4f8 0%, #d9e2ec 100%);
+    }
+    
+    /* Estilo del panel lateral (sidebar) */
+    [data-testid="stSidebar"] {
+        background-color: #ffffff !important;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+    }
+    
+    /* Animación para el menú de navegación (app y monitoreo) */
+    [data-testid="stSidebarNav"] a {
+        transition: all 0.3s ease-in-out !important;
+        border-radius: 8px !important;
+        margin: 0px 8px !important;
+    }
+    [data-testid="stSidebarNav"] a:hover {
+        transform: translateX(8px);
+        background-color: #e2e8f0 !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    [data-testid="stSidebarNav"] a:active {
+        transform: scale(0.95);
+    }
+    
+    /* Estilo tipo 'tarjeta' para el formulario */
+    [data-testid="stForm"] {
+        background-color: #ffffff;
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 8px 16px rgba(0,0,0,0.05);
+        border: 1px solid #e2e8f0;
+    }
+    
+    /* Colores para los títulos */
+    h1, h2, h3, h4 {
+        color: #102a43;
+    }
+    
+    /* Animación suave para el botón principal al pasar el mouse */
+    [data-testid="baseButton-primary"] {
+        transition: all 0.3s ease;
+        border-radius: 8px;
+    }
+    [data-testid="baseButton-primary"]:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 
-@st.cache_resource(show_spinner="Entrenando el modelo (primera vez en este servidor)...")
+
+@st.cache_resource(show_spinner=False)
 def _ensure_model() -> str:
     """Train the model on first run if no artifact exists yet, and return its path."""
     model_path = Path(os.getenv("MODEL_PATH", DEFAULT_MODEL_PATH))
     if not model_path.is_file():
-        from src.data_pipeline.ingest import download_give_me_some_credit
-        from src.data_pipeline.validate import (
-            clean_out_of_range_rows,
-            validate_input_data,
-        )
-        from src.ml.train import train_model
+        # Animación moderna de carga con checklist (Status)
+        with st.status("🛠️ **Configurando la plataforma (Primera Ejecución)**", expanded=True) as status:
+            import time
+            from src.data_pipeline.ingest import download_give_me_some_credit
+            from src.data_pipeline.validate import (
+                clean_out_of_range_rows,
+                validate_input_data,
+            )
+            from src.ml.train import train_model
 
-        data_dir = download_give_me_some_credit()
-        csv_files = sorted(Path(data_dir).glob("cs-training.csv")) or sorted(
-            Path(data_dir).glob("*.csv")
-        )
-        raw_data = pd.read_csv(csv_files[0], index_col=0)
-        raw_data = clean_out_of_range_rows(raw_data)
-        validate_input_data(raw_data, require_target=True)
-        train_model(raw_data, model_path=model_path, register=False)
+            st.write("📥 Descargando y preparando el dataset...")
+            time.sleep(0.5) # Pequeña pausa visual
+            data_dir = download_give_me_some_credit()
+            csv_files = sorted(Path(data_dir).glob("cs-training.csv")) or sorted(
+                Path(data_dir).glob("*.csv")
+            )
+            
+            st.write("🧹 Limpiando y validando datos crudos...")
+            time.sleep(0.5)
+            raw_data = pd.read_csv(csv_files[0], index_col=0)
+            raw_data = clean_out_of_range_rows(raw_data)
+            validate_input_data(raw_data, require_target=True)
+            
+            st.write("🧠 Entrenando el modelo de Machine Learning (puede tomar unos segundos)...")
+            train_model(raw_data, model_path=model_path, register=False)
+            
+            st.write("💾 Guardando el modelo para uso futuro...")
+            time.sleep(0.5)
+            
+            status.update(label="¡Modelo entrenado exitosamente! ✅", state="complete", expanded=False)
+            
     return str(model_path)
 
 
 MODEL_PATH = _ensure_model()
-
-st.title("💳 Evaluación de riesgo crediticio")
-st.caption(
-    "Demo de *default prediction* sobre el dataset Kaggle "
-    "\"Give Me Some Credit\". Completa los datos del solicitante: cada "
-    "campo indica, en su descripción, exactamente qué información "
-    "necesitas reunir para poder evaluar el riesgo."
-)
-
 schema = load_feature_schema()
 fields = schema["features"]
 
+# --- PANEL LATERAL (SIDEBAR) ---
+with st.sidebar:
+    st.title("ℹ️ Acerca de la App")
+    st.info(
+        "Esta aplicación evalúa el riesgo crediticio de un solicitante utilizando un modelo de "
+        "Machine Learning entrenado con el dataset **Give Me Some Credit**."
+    )
+    
+    st.markdown("---")
+    st.subheader("📖 Diccionario de Datos")
+    st.caption("¿Qué significa cada campo del formulario?")
+    
+    with st.expander("Ver descripciones de los campos", expanded=False):
+        for name, definition in fields.items():
+            st.markdown(f"- **{definition.get('label', name)}**: {definition.get('description', '')}")
+            
+    st.markdown("---")
+    st.link_button("📄 Ver Documentación API (Swagger)", "http://127.0.0.1:8000/docs", use_container_width=True)
+
+
+# --- INTERFAZ PRINCIPAL ---
+st.title("💳 Evaluación de Riesgo Crediticio")
+st.markdown(
+    "Completa los datos del solicitante a continuación. El modelo evaluará la "
+    "**probabilidad de impago (default)** y sugerirá si el crédito debe ser aprobado o rechazado."
+)
+st.divider()
+
 with st.form("credit_application"):
-    st.subheader("Datos del solicitante")
-    applicant_id = st.text_input("Identificador del solicitante (opcional)")
-
+    st.subheader("📝 Formulario de Solicitud")
+    
+    applicant_id = st.text_input(
+        "Identificador del solicitante (opcional)", 
+        placeholder="Ej. Nombre, DNI, Pasaporte..."
+    )
+    
     inputs: dict[str, float] = {}
-    field_items = list(fields.items())
-    columns = st.columns(2)
-
+    
+    # Valores por defecto para que la demo sea más rápida
     defaults = {
         "age": 40.0,
         "monthly_income": 5000.0,
@@ -87,77 +190,109 @@ with st.form("credit_application"):
         "revolving_utilization_unsecured": 0.2,
         "number_dependents": 1.0,
     }
-
-    for index, (name, definition) in enumerate(field_items):
-        target_column = columns[index % 2]
+    
+    def get_input(field_name: str, col):
+        """Helper para renderizar inputs dinámicamente y guardarlos en el dict `inputs`"""
+        definition = fields[field_name]
         min_value = float(definition.get("min", 0.0))
         max_value = definition.get("max")
-        default_value = max(defaults.get(name, min_value), min_value)
-        with target_column:
-            inputs[name] = st.number_input(
-                definition.get("label", name),
+        default_value = max(defaults.get(field_name, min_value), min_value)
+        with col:
+            inputs[field_name] = st.number_input(
+                definition.get("label", field_name),
                 min_value=min_value,
                 max_value=float(max_value) if max_value is not None else None,
                 value=float(default_value),
                 help=definition.get("description", ""),
             )
 
-    submitted = st.form_submit_button("Evaluar riesgo")
+    # 1. Datos Personales
+    st.markdown("#### 👤 Datos Personales")
+    col1, col2 = st.columns(2)
+    get_input("age", col1)
+    get_input("number_dependents", col2)
+    
+    # 2. Salud Financiera
+    st.markdown("#### 💰 Salud Financiera")
+    col3, col4 = st.columns(2)
+    get_input("monthly_income", col3)
+    get_input("debt_ratio", col4)
+    
+    col5, col6, col7 = st.columns(3)
+    get_input("number_open_credit_lines", col5)
+    get_input("number_real_estate_loans", col6)
+    get_input("revolving_utilization_unsecured", col7)
+    
+    # 3. Historial de Pagos
+    st.markdown("#### ⚠️ Historial de Atrasos (Últimos 2 años)")
+    col8, col9, col10 = st.columns(3)
+    get_input("number_of_time_30_59_days_past_due", col8)
+    get_input("number_of_time_60_89_days_past_due", col9)
+    get_input("number_of_times_90_days_late", col10)
 
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Botón principal resaltado
+    submitted = st.form_submit_button("🚀 Evaluar Perfil de Riesgo", type="primary", use_container_width=True)
+
+
+# --- RESULTADOS Y EXPLICACIÓN ---
 if submitted:
-    try:
-        result = predict_with_explanation(inputs, model_path=MODEL_PATH)
-    except ModelNotAvailableError as error:
-        st.error(str(error))
-        st.info(
-            "Entrena un modelo primero con `python -m src.ml.train` "
-            "(o `make train`) y vuelve a intentarlo."
-        )
-    else:
-        probability = result["probability"]
-        decision = result["decision"]
-        band = result["risk_band"]
-        band_color = {"bajo": "green", "medio": "orange", "alto": "red"}[band]
-
-        st.subheader("Resultado")
-        col1, col2 = st.columns(2)
-        col1.metric("Probabilidad de incumplimiento (default)", f"{probability:.1%}")
-        col2.markdown(
-            f"**Decisión sugerida:** `{decision.upper()}`\n\n"
-            f"**Nivel de riesgo:** :{band_color}[{band.upper()}]"
-        )
-
-        top_factors = result.get("top_factors", [])
-        if top_factors:
-            st.subheader("Factores que más influyeron (SHAP)")
-            factors_df = pd.DataFrame(top_factors).set_index("feature")
-            st.bar_chart(factors_df["impact"])
-            st.dataframe(
-                factors_df.reset_index()[["feature", "value", "impact"]],
-                use_container_width=True,
-                hide_index=True,
+    with st.spinner("🧠 Analizando el perfil con el modelo..."):
+        try:
+            result = predict_with_explanation(inputs, model_path=MODEL_PATH)
+        except ModelNotAvailableError as error:
+            st.error(str(error))
+            st.info(
+                "Entrena un modelo primero con `python -m src.ml.train` "
+                "(o `make train`) y vuelve a intentarlo."
             )
         else:
-            st.caption(
-                "La explicación SHAP no está disponible (instala `shap` para "
-                "habilitarla)."
-            )
-
-st.divider()
-with st.expander("¿Qué información necesito para usar esta demo?"):
-    for name, definition in fields.items():
-        st.markdown(f"- **{definition.get('label', name)}**: {definition.get('description', '')}")
-    st.markdown(
-        "Estos son exactamente los mismos campos que expone "
-        "`GET /api/v1/features` en la API."
-    )
-
-with st.expander("Acerca del modelo"):
-    st.markdown(
-        "Esta aplicación utiliza un modelo de riesgo crediticio entrenado "
-        "sobre el dataset **Give Me Some Credit**."
-    )
-    st.link_button(
-        "Documentación API",
-        "http://127.0.0.1:8000/docs",
-    )
+            st.divider()
+            st.header("📊 Resultados del Análisis")
+            
+            probability = result["probability"]
+            decision = result["decision"]
+            band = result["risk_band"]
+            
+            # Semáforo de UX según la banda de riesgo
+            if band == "bajo":
+                alert_box = st.success
+                icon = "✅"
+            elif band == "medio":
+                alert_box = st.warning
+                icon = "⚠️"
+            else:
+                alert_box = st.error
+                icon = "🚨"
+                
+            alert_box(f"**Decisión sugerida:** `{decision.upper()}` | **Nivel de riesgo:** {band.upper()} {icon}")
+            
+            col_a, col_b = st.columns([1, 2])
+            with col_a:
+                st.metric("Probabilidad de Impago (Default)", f"{probability:.1%}")
+            with col_b:
+                st.markdown("**Nivel de Alerta Visual:**")
+                st.progress(min(probability, 1.0)) # Asegura que el valor máximo sea 1.0
+                
+            top_factors = result.get("top_factors", [])
+            if top_factors:
+                st.subheader("🔍 Principales Factores de Riesgo")
+                st.markdown("Las siguientes variables fueron las que más impacto (SHAP) tuvieron en esta decisión:")
+                
+                factors_df = pd.DataFrame(top_factors).set_index("feature")
+                col_chart, col_table = st.columns([2, 1])
+                
+                with col_chart:
+                    st.bar_chart(factors_df["impact"])
+                with col_table:
+                    st.dataframe(
+                        factors_df.reset_index()[["feature", "value", "impact"]],
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+            else:
+                st.caption(
+                    "La explicación SHAP no está disponible (instala la librería `shap` para "
+                    "habilitarla)."
+                )

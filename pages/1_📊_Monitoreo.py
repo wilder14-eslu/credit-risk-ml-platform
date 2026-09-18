@@ -26,6 +26,64 @@ from src.orchestrator.monitor import decide_retrain
 st.set_page_config(
     page_title="Monitoreo · Credit Risk ML Platform", page_icon="📊", layout="centered"
 )
+
+# Inyección de CSS personalizado para mantener consistencia con app.py
+st.markdown(
+    """
+    <style>
+    /* Fondo con gradiente moderno para la aplicación principal */
+    .stApp {
+        background: linear-gradient(135deg, #f0f4f8 0%, #d9e2ec 100%);
+    }
+    
+    /* Estilo del panel lateral (sidebar) */
+    [data-testid="stSidebar"] {
+        background-color: #ffffff !important;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+    }
+    
+    /* Animación para el menú de navegación (app y monitoreo) */
+    [data-testid="stSidebarNav"] a {
+        transition: all 0.3s ease-in-out !important;
+        border-radius: 8px !important;
+        margin: 0px 8px !important;
+    }
+    [data-testid="stSidebarNav"] a:hover {
+        transform: translateX(8px);
+        background-color: #e2e8f0 !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    [data-testid="stSidebarNav"] a:active {
+        transform: scale(0.95);
+    }
+    
+    /* Estilo tipo 'tarjeta' para el formulario */
+    [data-testid="stForm"] {
+        background-color: #ffffff;
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 8px 16px rgba(0,0,0,0.05);
+        border: 1px solid #e2e8f0;
+    }
+    
+    /* Colores para los títulos */
+    h1, h2, h3, h4 {
+        color: #102a43;
+    }
+    
+    /* Animación suave para el botón principal al pasar el mouse */
+    [data-testid="baseButton-secondary"] {
+        transition: all 0.3s ease;
+        border-radius: 8px;
+    }
+    [data-testid="baseButton-secondary"]:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 st.title("📊 Monitoreo del modelo")
 st.caption(
     "Estado de drift de datos, performance en producción y la señal de "

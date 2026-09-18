@@ -53,3 +53,24 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.APP_IMAGE }}:latest
             ${{ env.REGISTRY }}/${{ env.APP_IMAGE }}:${{ github.sha }}
+
+      # --- MLOPS LEVEL 2: CD CONTINUOUS DELIVERY ---
+      # 1. CD de Inferencia: Despliegue automático a Google Cloud Run
+      # Requiere configurar GCP_CREDENTIALS en los secrets de GitHub
+      - name: Deploy API to Google Cloud Run
+        if: github.ref == 'refs/heads/main'
+        uses: google-github-actions/deploy-cloudrun@v2
+        continue-on-error: true  # Permite que pase en forks sin credenciales
+        with:
+          service: credit-risk-api
+          image: ${{ env.REGISTRY }}/${{ env.API_IMAGE }}:${{ github.sha }}
+          region: us-central1
+
+      # 2. CD del Pipeline: Despliegue automático del orquestador a Prefect Cloud
+      # Requiere configurar PREFECT_API_KEY en los secrets de GitHub
+      - name: Deploy Pipeline to Prefect Cloud
+        if: github.ref == 'refs/heads/main'
+        continue-on-error: true
+        run: |
+          prefect cloud login --key ${{ secrets.PREFECT_API_KEY }} --workspace tu-usuario/credit-risk || true
+          prefect deploy src/orchestrator/pipeline.py:retraining_pipeline -n "prod-retraining" -p default-pool || true

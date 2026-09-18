@@ -14,6 +14,7 @@ def record_prediction(
     probability: float,
     decision: str,
     applicant_id: str | None = None,
+    model_version: str = "champion",
     output_path: Path = DEFAULT_PREDICTION_LOG,
 ) -> None:
     event = {
@@ -22,6 +23,7 @@ def record_prediction(
         "features": features,
         "probability": probability,
         "decision": decision,
+        "model_version": model_version,
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("a", encoding="utf-8") as event_file:

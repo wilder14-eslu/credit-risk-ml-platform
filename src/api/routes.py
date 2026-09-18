@@ -58,11 +58,36 @@ async def features_schema() -> FeatureSchemaResponse:
     return FeatureSchemaResponse(target=schema["target"], fields=fields)
 
 
+import hashlib
+import os
+from pathlib import Path
+
 @router.post("/predict", response_model=PredictionResponse)
 async def predict(request: PredictionRequest) -> PredictionResponse:
     payload = request.model_dump(exclude={"applicant_id"})
+    
+    # --- LOGICA DE A/B TESTING ---
+    champion_path = os.getenv("MODEL_PATH", "data/processed/model.joblib")
+    challenger_path = os.getenv("CHALLENGER_MODEL_PATH", "data/processed/model_challenger.joblib")
+    
+    model_path_to_use = champion_path
+    model_version_tag = "champion"
+    
+    # Si existe un modelo challenger, enviamos 20% del tráfico hacia él de forma determinista
+    if Path(challenger_path).is_file():
+        if request.applicant_id:
+            h = int(hashlib.md5(request.applicant_id.encode()).hexdigest(), 16)
+            is_challenger = (h % 100) < 20  # 20%
+        else:
+            import random
+            is_challenger = random.random() < 0.2
+            
+        if is_challenger:
+            model_path_to_use = challenger_path
+            model_version_tag = "challenger"
+    
     try:
-        result = predict_with_explanation(payload)
+        result = predict_with_explanation(payload, model_path=model_path_to_use)
     except ModelNotAvailableError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
 
@@ -72,10 +97,13 @@ async def predict(request: PredictionRequest) -> PredictionResponse:
             result["probability"],
             result["decision"],
             applicant_id=request.applicant_id,
+            model_version=model_version_tag,
         )
     except Exception:  # pragma: no cover - logging must never break a prediction
         logger.exception("No se pudo registrar la predicción para monitoreo.")
 
+    # persist_prediction en postgres (si quisieras almacenar el tag A/B aquí, 
+    # requeriría un ALTER TABLE, por simplicidad usamos el JSONL para el monitoreo A/B)
     await persist_prediction(
         session_factory,
         request.applicant_id,
@@ -90,6 +118,7 @@ async def predict(request: PredictionRequest) -> PredictionResponse:
         decision=result["decision"],
         risk_band=result["risk_band"],
         top_factors=result.get("top_factors", []),
+        model_version=model_version_tag,
     )
 
 

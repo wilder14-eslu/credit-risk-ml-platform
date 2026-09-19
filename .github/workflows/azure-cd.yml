@@ -1,0 +1,62 @@
+name: Deploy to Azure Container Apps
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+  workflow_dispatch:
+
+env:
+  AZURE_CONTAINER_REGISTRY: "REPLACE_WITH_YOUR_ACR_NAME"
+  API_IMAGE_NAME: "credit-risk-api"
+  APP_IMAGE_NAME: "credit-risk-app"
+  RESOURCE_GROUP: "credit-risk-rg"
+  CONTAINER_ENV: "creditrisk-env"
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Log in to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Log in to ACR
+        run: |
+          az acr login --name ${{ env.AZURE_CONTAINER_REGISTRY }}
+
+      - name: Build and Push API Image
+        run: |
+          docker build -f docker/Dockerfile.api -t ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.API_IMAGE_NAME }}:${{ github.sha }} .
+          docker push ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.API_IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Build and Push App (Streamlit) Image
+        run: |
+          docker build -f docker/Dockerfile.app -t ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.APP_IMAGE_NAME }}:${{ github.sha }} .
+          docker push ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.APP_IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Deploy API to Azure Container Apps
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
+          containerAppName: credit-risk-api
+          imageToDeploy: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.API_IMAGE_NAME }}:${{ github.sha }}
+          environmentVariables: "DATABASE_URL=${{ secrets.AZURE_DATABASE_URL }}"
+          targetPort: 8000
+          ingress: external
+
+      - name: Deploy Frontend to Azure Container Apps
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
+          containerAppName: credit-risk-app
+          imageToDeploy: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.APP_IMAGE_NAME }}:${{ github.sha }}
+          targetPort: 8501
+          ingress: external

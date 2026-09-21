@@ -23,7 +23,28 @@ resource acr 'Microsoft.ContainerRegistry/registries@2023-01-01-preview' = {
     name: 'Basic'
   }
   properties: {
-    adminUserEnabled: true
+    // Fase 0, Capa 5: sin usuario admin del registry — el pull de imágenes
+    // se hace con la identidad administrada + rol AcrPull, no credenciales
+    // compartidas de larga duración.
+    adminUserEnabled: false
+  }
+}
+
+// Identidad administrada usada por los Container Apps para hacer pull del
+// ACR y leer secretos del Key Vault, sin credenciales estáticas.
+resource appIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: '${prefix}-identity'
+  location: location
+}
+
+resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(acr.id, appIdentity.id, 'AcrPull')
+  scope: acr
+  properties: {
+    // Rol AcrPull incorporado de Azure.
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
+    principalId: appIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
   }
 }
 
@@ -81,6 +102,44 @@ resource postgresFirewall 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRul
   }
 }
 
+// Fase 0, Capa 5: secretos gestionados en Key Vault en vez de variables de
+// entorno planas en el pipeline de CD. Este Key Vault guarda hoy la
+// contraseña de Postgres; la migración de la Container App para leerla vía
+// secretRef (en vez de recibirla en environmentVariables, como hace hoy
+// azure-cd.yml) queda pendiente como siguiente paso, no se fuerza aquí sin
+// poder probarla contra una suscripción real.
+resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+  name: '${prefix}-kv'
+  location: location
+  properties: {
+    sku: {
+      family: 'A'
+      name: 'standard'
+    }
+    tenantId: subscription().tenantId
+    enableRbacAuthorization: true
+  }
+}
+
+resource dbPasswordSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: keyVault
+  name: 'db-admin-password'
+  properties: {
+    value: dbAdminPassword
+  }
+}
+
+resource keyVaultSecretsUserRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(keyVault.id, appIdentity.id, 'KeyVaultSecretsUser')
+  scope: keyVault
+  properties: {
+    // Rol Key Vault Secrets User incorporado de Azure (solo lectura de secretos).
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
+    principalId: appIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 // Database creation
 resource postgresDatabase 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-03-01-preview' = {
   parent: postgresServer
@@ -89,3 +148,7 @@ resource postgresDatabase 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2
 
 output acrLoginServer string = acr.properties.loginServer
 output postgresFqdn string = postgresServer.properties.fullyQualifiedDomainName
+output appIdentityId string = appIdentity.id
+output appIdentityClientId string = appIdentity.properties.clientId
+output keyVaultName string = keyVault.name
+output keyVaultUri string = keyVault.properties.vaultUri

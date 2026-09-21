@@ -42,13 +42,21 @@ jobs:
           docker build -f docker/Dockerfile.app -t ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.APP_IMAGE_NAME }}:${{ github.sha }} .
           docker push ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.APP_IMAGE_NAME }}:${{ github.sha }}
 
+      # TODO (Fase 0, Capa 5): DATABASE_URL sigue viajando como variable de
+      # entorno plana desde un GitHub secret. azure/main.bicep ya provisiona
+      # un Key Vault + identidad administrada (appIdentityId/appIdentityClientId
+      # en sus outputs) para reemplazar esto por un secretRef de Key Vault en
+      # la Container App — no se cambia aquí porque requiere la Container App
+      # ya creada con esa identidad asignada, y no hay forma de probarlo sin
+      # una suscripción real. Ver la sección "Riesgos, trade-offs y siguientes
+      # pasos" del doc de arquitectura híbrida de seguridad.
       - name: Deploy API to Azure Container Apps
         uses: azure/container-apps-deploy-action@v1
         with:
           resourceGroup: ${{ env.RESOURCE_GROUP }}
           containerAppName: credit-risk-api
           imageToDeploy: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.API_IMAGE_NAME }}:${{ github.sha }}
-          environmentVariables: "DATABASE_URL=${{ secrets.AZURE_DATABASE_URL }}"
+          environmentVariables: "DATABASE_URL=${{ secrets.AZURE_DATABASE_URL }}" "API_KEY=${{ secrets.API_KEY }}"
           targetPort: 8000
           ingress: external
 

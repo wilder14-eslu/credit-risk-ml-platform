@@ -16,6 +16,7 @@ import joblib
 import pandas as pd
 
 from src.feature_store.features import FEATURE_NAMES, build_features
+from src.ml.integrity import verify_model_integrity
 
 DEFAULT_MODEL_PATH = "data/processed/model.joblib"
 
@@ -42,6 +43,9 @@ def load_model(model_path: Path | str | None = None) -> Any:
             f"No se encontró un modelo entrenado en {resolved_path}. "
             "Ejecuta `python -m src.ml.train` (o `make train`) primero."
         )
+    # Fase 0, Capa 3: nunca deserializar un artefacto sin verificar su hash
+    # contra el manifest generado en el entrenamiento (src.ml.integrity).
+    verify_model_integrity(resolved_path)
     return joblib.load(resolved_path)
 
 

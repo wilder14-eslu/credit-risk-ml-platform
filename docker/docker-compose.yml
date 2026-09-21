@@ -6,7 +6,10 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-credit_risk}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-credit_risk}
     ports:
-      - "5432:5432"
+      # Fase 0: solo accesible desde el propio host (127.0.0.1), nunca
+      # publicado a toda la red; en despliegues (Azure) Postgres no debe
+      # exponer puerto en absoluto, solo red interna/privada.
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ../src/database/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:ro
@@ -18,7 +21,8 @@ services:
       --backend-store-uri /mlflow/mlruns
       --default-artifact-root /mlflow/mlruns
     ports:
-      - "5000:5000"
+      # Fase 0: igual que Postgres, solo accesible en 127.0.0.1 localmente.
+      - "127.0.0.1:5000:5000"
     volumes:
       - mlflow_data:/mlflow/mlruns
 

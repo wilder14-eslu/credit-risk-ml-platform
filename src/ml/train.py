@@ -30,6 +30,7 @@ import pandas as pd
 from xgboost import XGBClassifier
 
 from src.data_pipeline.preprocess import prepare_training_data
+from src.ml.integrity import write_manifest
 from src.ml.metrics import compute_classification_metrics, diagnose_fit
 from src.monitoring.drift import save_reference_distribution
 
@@ -208,6 +209,7 @@ def train_model(
 
     resolved_model_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(model, resolved_model_path)
+    write_manifest(resolved_model_path)  # Fase 0, Capa 3: manifest de integridad
 
     run_id = _log_to_mlflow(
         algorithm, resolved_params, mlflow_metrics, model, resolved_model_path, register

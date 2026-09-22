@@ -3,6 +3,15 @@ import os
 import secrets
 from typing import ClassVar
 
+from dotenv import load_dotenv
+
+# El resto del módulo lee configuración con os.getenv(...) directo, así que
+# el .env debe cargarse aquí, antes de que la clase Settings se defina y
+# se instancie más abajo. Sin esta línea, crear/editar .env no tenía ningún
+# efecto (bug preexistente: python-dotenv ya era una dependencia transitiva
+# de pydantic-settings, pero nunca se invocaba).
+load_dotenv()
+
 logger = logging.getLogger(__name__)
 
 

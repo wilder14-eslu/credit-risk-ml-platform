@@ -4,6 +4,7 @@ uvicorn[standard]>=0.28.0
 pydantic>=2.6.0
 pydantic-settings>=2.2.0
 slowapi>=0.1.9  # Fase 0: rate limiting
+python-dotenv>=1.0.1  # Fase 0: cargar .env en src/config.py
 
 # 2. Conexión a Base de Datos PostgreSQL & ORM
 sqlalchemy>=2.0.28

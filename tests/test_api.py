@@ -75,3 +75,18 @@ def test_docs_require_api_key_when_enabled() -> None:
     assert client.get("/docs").status_code == 401
     assert client.get("/openapi.json").status_code == 401
     assert client.get("/docs", headers=AUTH_HEADERS).status_code == 200
+
+
+def test_docs_also_accept_api_key_as_query_param() -> None:
+    """Un navegador normal no manda cabeceras al navegar; /docs debe aceptar
+    también `?api_key=...` (y el openapi_url embebido en la página debe
+    llevar la misma key, para que el fetch del propio Swagger UI funcione).
+    """
+    if not settings.docs_enabled:
+        return
+    client = TestClient(app)
+    response = client.get(f"/docs?api_key={settings.api_key}")
+    assert response.status_code == 200
+    assert f"api_key={settings.api_key}" in response.text
+    assert client.get(f"/openapi.json?api_key={settings.api_key}").status_code == 200
+    assert client.get("/docs?api_key=clave-incorrecta").status_code == 401

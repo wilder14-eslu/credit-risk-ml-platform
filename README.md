@@ -305,6 +305,40 @@ real de un solicitante ya evaluado.
 | `/api/v1/outcomes` | POST | Reporta el resultado real (¿incumplió o no?) de un solicitante ya evaluado, para calcular performance en vivo |
 | `/api/v1/monitoring/status` | GET | Estado actual de drift (tasa y PSI por feature), performance en vivo y si se recomienda reentrenar |
 
+### Autenticación
+
+`/api/v1/predict`, `/api/v1/outcomes` y `/api/v1/monitoring/status` exigen
+la cabecera `X-API-Key` en cada request (`/health` y `/features` quedan
+públicos). Define tu propia clave en `.env` (ver `.env.example`):
+
+```
+API_KEY=una-clave-fija-para-tu-entorno
+```
+
+Si `API_KEY` no está definida, el servidor genera una clave temporal en
+cada arranque y la registra en el log — cómodo para probar localmente,
+pero se pierde en cada reinicio.
+
+Ejemplo de request autenticado:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/predict \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"applicant_id": "demo-1", "age": 29, ...}'
+```
+
+`/docs`, `/redoc` y `/openapi.json` usan la misma clave, pero también
+aceptan `?api_key=...` en la URL (un navegador no puede adjuntar
+cabeceras al navegar directo a una URL):
+
+```
+http://127.0.0.1:8000/docs?api_key=<tu API_KEY>
+```
+
+Desactívalos por completo en un entorno donde no quieras exponerlos ni
+autenticados con `DOCS_ENABLED=false`.
+
 Ejemplo de solicitud a `/api/v1/predict`:
 
 ```json

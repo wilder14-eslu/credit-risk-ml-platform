@@ -1,0 +1,75 @@
+# Blueprint de Render: despliega el stack completo (API FastAPI + Postgres
+# gestionado + dashboard de Streamlit) desde este mismo repo, disparado por
+# GitHub. Ver README.md ("## API" / "Autenticación") y el doc de
+# arquitectura híbrida de seguridad (Fase 0) para el contexto completo.
+#
+# Después del primer "Deploy Blueprint", Render asigna la URL pública real
+# de cada servicio (algo como https://credit-risk-api-xxxx.onrender.com).
+# Blueprint no puede resolverla de antemano (fromService solo da el host
+# interno de red privada, no la URL https pública que necesita el botón de
+# Swagger en el navegador del usuario), así que hay que actualizar a mano,
+# en el Dashboard de Render, dos variables una vez que existan esas URLs:
+#   - CORS_ORIGINS en credit-risk-api      -> URL real de credit-risk-dashboard
+#   - API_PUBLIC_URL en credit-risk-dashboard -> URL real de credit-risk-api
+#
+# API_KEY (sync: false en ambos servicios) hay que escribirla a mano en el
+# Dashboard tras el primer deploy -- usa el MISMO valor en los dos
+# servicios, o el botón "Ver Documentación API (Swagger)" del dashboard
+# no va a autenticar correctamente.
+#
+# El plan free de Postgres en Render expira a los 90 días (límite de
+# Render, no de este proyecto) -- suficiente para una demo de portafolio;
+# si necesitas algo permanente, sube el plan de credit-risk-postgres.
+
+databases:
+  - name: credit-risk-postgres
+    plan: free
+    databaseName: credit_risk
+    user: credit_risk
+
+services:
+  - type: web
+    name: credit-risk-api
+    runtime: docker
+    dockerfilePath: ./docker/Dockerfile.api
+    dockerContext: .
+    plan: free
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: credit-risk-postgres
+          property: connectionString
+      - key: API_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        value: "https://credit-risk-dashboard.onrender.com"
+      - key: RATE_LIMIT
+        value: "60/minute"
+      - key: DOCS_ENABLED
+        value: "true"
+      # Entrena el modelo en el primer arranque (no se commitea el .joblib
+      # a git a propósito): ver src/ml/bootstrap.py.
+      - key: AUTO_TRAIN_MODEL
+        value: "true"
+      - key: MODEL_PATH
+        value: data/processed/model.joblib
+      - key: DECISION_THRESHOLD
+        value: "0.5"
+
+  - type: web
+    name: credit-risk-dashboard
+    runtime: docker
+    dockerfilePath: ./docker/Dockerfile.app
+    dockerContext: .
+    plan: free
+    envVars:
+      # Mismo valor que API_KEY en credit-risk-api (ver nota arriba).
+      - key: API_KEY
+        sync: false
+      - key: API_PUBLIC_URL
+        value: "https://credit-risk-api.onrender.com"
+      - key: MODEL_PATH
+        value: data/processed/model.joblib
+      - key: DECISION_THRESHOLD
+        value: "0.5"

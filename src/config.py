@@ -15,6 +15,21 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
+def _normalize_database_url(raw_url: str) -> str:
+    """Fuerza el driver async (asyncpg) en la URL de Postgres.
+
+    Render (y otros proveedores) entregan la connection string como
+    `postgres://...` o `postgresql://...`; SQLAlchemy con
+    `create_async_engine` (src/database/connection.py) exige el driver
+    explícito `postgresql+asyncpg://...`, o falla al primer uso.
+    """
+    if raw_url.startswith("postgres://"):
+        return "postgresql+asyncpg://" + raw_url[len("postgres://") :]
+    if raw_url.startswith("postgresql://"):
+        return "postgresql+asyncpg://" + raw_url[len("postgresql://") :]
+    return raw_url
+
+
 def _generate_dev_api_key() -> str:
     """Clave temporal para una sola ejecución, cuando API_KEY no está configurada.
 
@@ -35,9 +50,11 @@ def _generate_dev_api_key() -> str:
 
 class Settings:
     app_name = os.getenv("APP_NAME", "Credit Risk ML Platform")
-    database_url = os.getenv(
-        "DATABASE_URL",
-        "postgresql+asyncpg://credit_risk:credit_risk@localhost:5432/credit_risk",
+    database_url = _normalize_database_url(
+        os.getenv(
+            "DATABASE_URL",
+            "postgresql+asyncpg://credit_risk:credit_risk@localhost:5432/credit_risk",
+        )
     )
     model_path = os.getenv("MODEL_PATH", "data/processed/model.joblib")
 
@@ -48,6 +65,13 @@ class Settings:
     ]
     rate_limit = os.getenv("RATE_LIMIT", "60/minute")
     docs_enabled = os.getenv("DOCS_ENABLED", "true").strip().lower() != "false"
+
+    # Entrena un modelo automáticamente al arrancar si no hay ningún
+    # artefacto en MODEL_PATH (ver src/ml/bootstrap.py). Pensado para un
+    # despliegue "clone-and-run" (Render) donde el modelo no está commiteado
+    # a git; en local normalmente se deja en false (falla con 503 en vez de
+    # entrenar en segundo plano sin avisar).
+    auto_train_model = os.getenv("AUTO_TRAIN_MODEL", "false").strip().lower() == "true"
 
 
 settings = Settings()

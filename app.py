@@ -9,12 +9,14 @@ numbers shown here match the API's output. Each input field is labeled and
 annotated with the exact description from `config/data_schema.yaml`, so it
 is always explicit what information is needed to get an evaluation.
 
-On a fresh deployment (e.g. Streamlit Community Cloud) there is no
+On a fresh deployment (e.g. Render, Streamlit Community Cloud) there is no
 pre-trained model artifact committed to the repo (it is gitignored on
 purpose: models do not belong in git history). `_ensure_model()` below
 trains one automatically, once, from the dataset that *is* committed
 (`DATA/GiveMeSomeCredit/`), and caches it for the life of the container so
-this file works as a true "clone and run" demo.
+this file works as a true "clone and run" demo. The FastAPI service
+(`src/api/main.py`) does the same thing at startup via the shared
+`src.ml.bootstrap.ensure_model_trained`, when `AUTO_TRAIN_MODEL=true`.
 """
 
 from __future__ import annotations
@@ -23,10 +25,12 @@ import os
 from pathlib import Path
 
 import pandas as pd
-import streamlit as st
 import plotly.graph_objects as go
+import streamlit as st
 
+from src.config import settings
 from src.feature_store.features import load_feature_schema
+from src.ml.bootstrap import ensure_model_trained
 from src.ml.predict import (
     DEFAULT_MODEL_PATH,
     ModelNotAvailableError,
@@ -103,40 +107,18 @@ st.markdown(
 
 @st.cache_resource(show_spinner=False)
 def _ensure_model() -> str:
-    """Train the model on first run if no artifact exists yet, and return its path."""
+    """Train the model on first run if no artifact exists yet, and return its path.
+
+    La lógica de entrenamiento vive en `src.ml.bootstrap` (compartida con la
+    API); aquí solo se envuelve con la UI de progreso de Streamlit.
+    """
     model_path = Path(os.getenv("MODEL_PATH", DEFAULT_MODEL_PATH))
     if not model_path.is_file():
-        # Animación moderna de carga con checklist (Status)
         with st.status("🛠️ **Configurando la plataforma (Primera Ejecución)**", expanded=True) as status:
-            import time
-            from src.data_pipeline.ingest import download_give_me_some_credit
-            from src.data_pipeline.validate import (
-                clean_out_of_range_rows,
-                validate_input_data,
-            )
-            from src.ml.train import train_model
-
-            st.write("📥 Descargando y preparando el dataset...")
-            time.sleep(0.5) # Pequeña pausa visual
-            data_dir = download_give_me_some_credit()
-            csv_files = sorted(Path(data_dir).glob("cs-training.csv")) or sorted(
-                Path(data_dir).glob("*.csv")
-            )
-            
-            st.write("🧹 Limpiando y validando datos crudos...")
-            time.sleep(0.5)
-            raw_data = pd.read_csv(csv_files[0], index_col=0)
-            raw_data = clean_out_of_range_rows(raw_data)
-            validate_input_data(raw_data, require_target=True)
-            
-            st.write("🧠 Entrenando el modelo de Machine Learning (puede tomar unos segundos)...")
-            train_model(raw_data, model_path=model_path, register=False)
-            
-            st.write("💾 Guardando el modelo para uso futuro...")
-            time.sleep(0.5)
-            
+            ensure_model_trained(model_path, on_step=st.write)
+            st.write("💾 Modelo guardado para uso futuro.")
             status.update(label="¡Modelo entrenado exitosamente! ✅", state="complete", expanded=False)
-            
+
     return str(model_path)
 
 
@@ -165,7 +147,12 @@ with st.sidebar:
             st.markdown(f"- **{definition.get('label', name)}**: {definition.get('description', '')}")
             
     st.markdown("---")
-    st.link_button("📄 Ver Documentación API (Swagger)", "http://127.0.0.1:8000/docs", use_container_width=True)
+    _api_public_url = os.getenv("API_PUBLIC_URL", "http://127.0.0.1:8000").rstrip("/")
+    st.link_button(
+        "📄 Ver Documentación API (Swagger)",
+        f"{_api_public_url}/docs?api_key={settings.api_key}",
+        use_container_width=True,
+    )
 
     st.markdown("---")
     st.subheader("🕒 Historial de la Sesión")

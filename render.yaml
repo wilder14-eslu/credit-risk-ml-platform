@@ -52,6 +52,8 @@ services:
       # a git a propósito): ver src/ml/bootstrap.py.
       - key: AUTO_TRAIN_MODEL
         value: "true"
+      - key: MLFLOW_ALLOW_FILE_STORE
+        value: "true"
       - key: MODEL_PATH
         value: data/processed/model.joblib
       - key: DECISION_THRESHOLD
@@ -69,6 +71,8 @@ services:
         sync: false
       - key: API_PUBLIC_URL
         value: "https://credit-risk-api.onrender.com"
+      - key: MLFLOW_ALLOW_FILE_STORE
+        value: "true"
       - key: MODEL_PATH
         value: data/processed/model.joblib
       - key: DECISION_THRESHOLD

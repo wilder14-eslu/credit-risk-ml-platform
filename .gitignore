@@ -1,20 +1,40 @@
-.env
+# Entornos y cachés
 .venv/
+venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
 *.egg-info/
+build/
+dist/
 
-data/raw/*
-!data/raw/.gitkeep
-data/processed/*
-!data/processed/.gitkeep
+# Secretos
+.env
+.databrickscfg
 
+# Artefactos locales (en producción viven en Unity Catalog / MLflow)
+artifacts/
 mlruns/
 *.joblib
+*.sqlite
+DATA/processed/
 
-# Documentos de referencia locales (no redistribuir)
+# Databricks Asset Bundles
+.databricks/
+
+# Herramientas locales
+.claude/
+.agents/
+_claude_tmp/
+
+# Referencias locales no redistribuibles
 *.pdf
 *.xlsx
+
+# CatBoost
+catboost_info/

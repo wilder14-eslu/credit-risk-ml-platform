@@ -1,0 +1,222 @@
+# Jobs serverless de la plataforma. Orden de Google MLOps nivel 2:
+#   CT pipeline  : ingest -> validate/features -> train/register -> validate/deploy
+#   Monitoring   : simulate -> monitor -> A/B -> (condition) -> run_job(CT pipeline)
+resources:
+  jobs:
+    ct_training_pipeline:
+      name: credit-risk-ct-training-pipeline
+      description: >-
+        Continuous Training: ingesta Bronze, calidad + feature table Gold, benchmark
+        + Optuna, registro en Unity Catalog, validación champion/challenger y
+        despliegue en Model Serving con split A/B.
+      max_concurrent_runs: 1
+      tags:
+        project: credit-risk
+        layer: continuous-training
+      schedule:
+        quartz_cron_expression: "0 0 6 ? * MON"
+        timezone_id: America/Lima
+      parameters:
+        - name: trigger
+          default: schedule
+        - name: optuna_trials
+          default: ${var.optuna_trials}
+      environments:
+        - environment_key: ml
+          spec:
+            environment_version: "3"
+            dependencies:
+              - mlflow>=3.1
+              - xgboost>=2.0
+              - lightgbm>=4.3
+              - catboost>=1.2
+              - optuna>=3.6
+              - scikit-learn>=1.4
+              - pyyaml>=6.0
+              - databricks-sdk>=0.40
+      tasks:
+        - task_key: ingest_bronze
+          environment_key: ml
+          spark_python_task:
+            python_file: ../jobs/01_setup_and_ingest.py
+            parameters: &common
+              - "--project-root"
+              - "${workspace.file_path}"
+              - "--catalog"
+              - "${var.catalog}"
+              - "--schema"
+              - "${var.schema}"
+
+        - task_key: validate_and_features
+          depends_on:
+            - task_key: ingest_bronze
+          environment_key: ml
+          spark_python_task:
+            python_file: ../jobs/02_validate_and_features.py
+            parameters: *common
+
+        - task_key: train_and_register
+          depends_on:
+            - task_key: validate_and_features
+          environment_key: ml
+          spark_python_task:
+            python_file: ../jobs/03_train_register.py
+            parameters:
+              - "--project-root"
+              - "${workspace.file_path}"
+              - "--catalog"
+              - "${var.catalog}"
+              - "--schema"
+              - "${var.schema}"
+              - "--optuna-trials"
+              - "{{job.parameters.optuna_trials}}"
+              - "--trigger"
+              - "{{job.parameters.trigger}}"
+              - "--git-sha"
+              - "${var.git_sha}"
+
+        - task_key: validate_and_deploy
+          depends_on:
+            - task_key: train_and_register
+          environment_key: ml
+          spark_python_task:
+            python_file: ../jobs/04_validate_and_deploy.py
+            parameters:
+              - "--project-root"
+              - "${workspace.file_path}"
+              - "--catalog"
+              - "${var.catalog}"
+              - "--schema"
+              - "${var.schema}"
+              - "--deploy-serving"
+              - "${var.deploy_serving}"
+
+    production_monitoring:
+      name: credit-risk-production-monitoring
+      description: >-
+        Simula tráfico (opcional), calcula data/prediction/concept drift, evalúa el
+        A/B test y dispara el pipeline de CT cuando el monitoreo lo exige.
+      max_concurrent_runs: 1
+      tags:
+        project: credit-risk
+        layer: monitoring
+      schedule:
+        quartz_cron_expression: "0 0 7 * * ?"
+        timezone_id: America/Lima
+      parameters:
+        - name: scenario
+          default: none
+        - name: simulate
+          default: "true"
+        - name: batch_size
+          default: "2000"
+      environments:
+        - environment_key: ml
+          spec:
+            environment_version: "3"
+            dependencies:
+              - mlflow>=3.1
+              - xgboost>=2.0
+              - lightgbm>=4.3
+              - catboost>=1.2
+              - scikit-learn>=1.4
+              - pyyaml>=6.0
+              - databricks-sdk>=0.40
+      tasks:
+        - task_key: should_simulate
+          condition_task:
+            op: EQUAL_TO
+            left: "{{job.parameters.simulate}}"
+            right: "true"
+
+        - task_key: simulate_traffic
+          depends_on:
+            - task_key: should_simulate
+              outcome: "true"
+          environment_key: ml
+          spark_python_task:
+            python_file: ../jobs/05_simulate_traffic.py
+            parameters:
+              - "--project-root"
+              - "${workspace.file_path}"
+              - "--catalog"
+              - "${var.catalog}"
+              - "--schema"
+              - "${var.schema}"
+              - "--scenario"
+              - "{{job.parameters.scenario}}"
+              - "--batch-size"
+              - "{{job.parameters.batch_size}}"
+
+        - task_key: monitor_drift
+          depends_on:
+            - task_key: simulate_traffic
+            - task_key: should_simulate
+              outcome: "false"
+          run_if: AT_LEAST_ONE_SUCCESS
+          environment_key: ml
+          spark_python_task:
+            python_file: ../jobs/06_monitor.py
+            parameters: *common
+
+        - task_key: ab_evaluate
+          depends_on:
+            - task_key: monitor_drift
+          environment_key: ml
+          spark_python_task:
+            python_file: ../jobs/07_ab_evaluate.py
+            parameters:
+              - "--project-root"
+              - "${workspace.file_path}"
+              - "--catalog"
+              - "${var.catalog}"
+              - "--schema"
+              - "${var.schema}"
+              - "--deploy-serving"
+              - "${var.deploy_serving}"
+
+        - task_key: needs_retraining
+          depends_on:
+            - task_key: ab_evaluate
+          condition_task:
+            op: EQUAL_TO
+            left: "{{tasks.monitor_drift.values.retrain}}"
+            right: "true"
+
+        - task_key: trigger_continuous_training
+          depends_on:
+            - task_key: needs_retraining
+              outcome: "true"
+          run_job_task:
+            job_id: ${resources.jobs.ct_training_pipeline.id}
+            job_parameters:
+              trigger: monitoring
+
+    model_rollback:
+      name: credit-risk-model-rollback
+      description: Rollback manual del champion a la versión anterior (@previous_champion).
+      tags:
+        project: credit-risk
+        layer: operations
+      environments:
+        - environment_key: ml
+          spec:
+            environment_version: "3"
+            dependencies:
+              - mlflow>=3.1
+              - pyyaml>=6.0
+              - databricks-sdk>=0.40
+      tasks:
+        - task_key: rollback
+          environment_key: ml
+          spark_python_task:
+            python_file: ../jobs/08_rollback.py
+            parameters:
+              - "--project-root"
+              - "${workspace.file_path}"
+              - "--catalog"
+              - "${var.catalog}"
+              - "--schema"
+              - "${var.schema}"
+              - "--deploy-serving"
+              - "${var.deploy_serving}"

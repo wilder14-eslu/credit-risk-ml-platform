@@ -1,0 +1,76 @@
+name: CD
+
+# Se ejecuta solo cuando CI termina en verde sobre main.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_training:
+        description: "Ejecutar el pipeline de CT en dev después del deploy"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-dev:
+    name: Deploy bundle -> dev
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    environment: dev
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: databricks/setup-cli@main
+      - name: Verificar credenciales
+        id: creds
+        run: |
+          if [ -z "$DATABRICKS_HOST" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Sin secretos de Databricks: se omite el despliegue."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Validate + deploy (dev)
+        if: steps.creds.outputs.configured == 'true'
+        run: |
+          databricks bundle validate -t dev
+          databricks bundle deploy -t dev --var="git_sha=${GITHUB_SHA::7}"
+      - name: Test de integración (pipeline de CT en dev)
+        if: steps.creds.outputs.configured == 'true' && inputs.run_training
+        run: databricks bundle run -t dev ct_training_pipeline --params trigger=ci,optuna_trials=3
+    outputs:
+      configured: ${{ steps.creds.outputs.configured }}
+
+  deploy-prod:
+    name: Deploy bundle -> prod
+    needs: deploy-dev
+    if: needs.deploy-dev.outputs.configured == 'true'
+    runs-on: ubuntu-latest
+    environment: prod   # agrega "required reviewers" en GitHub para aprobación manual
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: databricks/setup-cli@main
+      - run: databricks bundle deploy -t prod --var="git_sha=${GITHUB_SHA::7}"
+
+  deploy-render:
+    name: Deploy gateway y dashboard en Render
+    needs: deploy-prod
+    runs-on: ubuntu-latest
+    env:
+      GATEWAY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_GATEWAY }}
+      DASHBOARD_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_DASHBOARD }}
+    steps:
+      - name: Disparar deploy hooks
+        run: |
+          [ -n "$GATEWAY_HOOK" ] && curl -fsS -X POST "$GATEWAY_HOOK" || echo "Sin hook del gateway"
+          [ -n "$DASHBOARD_HOOK" ] && curl -fsS -X POST "$DASHBOARD_HOOK" || echo "Sin hook del dashboard"

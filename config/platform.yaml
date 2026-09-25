@@ -1,0 +1,59 @@
+# Configuración operativa de la plataforma (umbrales de MLOps).
+# Todo lo que decide "entrenar / promover / alertar" vive aquí, versionado en
+# Git, para que un cambio de política pase por CI/CD igual que el código.
+
+data:
+  test_size: 0.20
+  validation_size: 0.15      # sobre el train, para early stopping / tuning
+  random_state: 42
+  # Proporción del dataset reservada como "tráfico de producción" simulado
+  # (nunca se usa para entrenar; alimenta al simulador y al monitoreo).
+  production_holdout: 0.30
+
+training:
+  candidates: [logistic_regression, xgboost, lightgbm, catboost]
+  selection_metric: test_roc_auc
+  optuna_trials: 25
+  optuna_timeout_seconds: 600
+  decision_threshold: 0.50   # se recalibra por costo en metrics.optimal_threshold
+  cost_false_negative: 5.0   # otorgar crédito a quien incumple
+  cost_false_positive: 1.0   # rechazar a un buen pagador
+
+quality_gates:
+  # Gate absoluto: el challenger nunca se registra si no cumple esto.
+  min_test_roc_auc: 0.80
+  max_overfit_gap: 0.07
+  max_brier: 0.08
+  max_latency_ms: 5.0
+  # Gate relativo: para reemplazar al champion debe mejorarlo en al menos esto.
+  min_auc_improvement: 0.002
+
+ab_testing:
+  challenger_traffic: 0.20   # fracción del tráfico al challenger
+  min_labeled_per_arm: 500   # tamaño mínimo antes de decidir
+  alpha: 0.05
+  bootstrap_iterations: 500
+  max_test_days: 14          # si no hay significancia, se mantiene el champion
+
+monitoring:
+  window_days: 7
+  min_rows: 200
+  psi_warning: 0.10
+  psi_alert: 0.25
+  ks_pvalue_alert: 0.01
+  max_features_drifted: 3        # # features con PSI >= alerta para disparar CT
+  prediction_psi_alert: 0.20
+  default_rate_abs_change: 0.03  # prior shift (cambio en P(y))
+  auc_drop_alert: 0.05           # concept drift: caída de AUC vs referencia
+  ks_stat_drop_alert: 0.10
+  brier_increase_alert: 0.02
+  ddm_warning_level: 2.0
+  ddm_drift_level: 3.0
+  page_hinkley_delta: 0.005
+  page_hinkley_lambda: 50.0
+  retrain_cooldown_hours: 24     # evita reentrenar en bucle
+
+serving:
+  endpoint_name: credit-risk-endpoint
+  workload_size: Small
+  scale_to_zero: true

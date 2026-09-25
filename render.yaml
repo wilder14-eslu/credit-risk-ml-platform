@@ -1,79 +1,55 @@
-# Blueprint de Render: despliega el stack completo (API FastAPI + Postgres
-# gestionado + dashboard de Streamlit) desde este mismo repo, disparado por
-# GitHub. Ver README.md ("## API" / "Autenticación") y el doc de
-# arquitectura híbrida de seguridad (Fase 0) para el contexto completo.
-#
-# Después del primer "Deploy Blueprint", Render asigna la URL pública real
-# de cada servicio (algo como https://credit-risk-api-xxxx.onrender.com).
-# Blueprint no puede resolverla de antemano (fromService solo da el host
-# interno de red privada, no la URL https pública que necesita el botón de
-# Swagger en el navegador del usuario), así que hay que actualizar a mano,
-# en el Dashboard de Render, dos variables una vez que existan esas URLs:
-#   - CORS_ORIGINS en credit-risk-api      -> URL real de credit-risk-dashboard
-#   - API_PUBLIC_URL en credit-risk-dashboard -> URL real de credit-risk-api
-#
-# API_KEY (sync: false en ambos servicios) hay que escribirla a mano en el
-# Dashboard tras el primer deploy -- usa el MISMO valor en los dos
-# servicios, o el botón "Ver Documentación API (Swagger)" del dashboard
-# no va a autenticar correctamente.
-#
-# El plan free de Postgres en Render expira a los 90 días (límite de
-# Render, no de este proyecto) -- suficiente para una demo de portafolio;
-# si necesitas algo permanente, sube el plan de credit-risk-postgres.
-
-databases:
-  - name: credit-risk-postgres
-    plan: free
-    databaseName: credit_risk
-    user: credit_risk
-
+# Render Blueprint: gateway FastAPI + panel Streamlit.
+# El modelo NO corre aquí: el gateway consulta Databricks Model Serving.
 services:
   - type: web
-    name: credit-risk-api
-    runtime: docker
-    dockerfilePath: ./docker/Dockerfile.api
-    dockerContext: .
+    name: credit-risk-gateway
+    runtime: python
     plan: free
-    healthCheckPath: /api/v1/health
+    region: oregon
+    buildCommand: pip install -r gateway/requirements.txt && pip install --no-deps -e .
+    startCommand: uvicorn gateway.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: false   # lo dispara el pipeline de CD cuando CI pasa
     envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: credit-risk-postgres
-          property: connectionString
-      - key: API_KEY
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: SERVING_BACKEND
+        value: databricks
+      - key: LOG_SINK
+        value: databricks
+      - key: SERVING_ENDPOINT
+        value: credit-risk-endpoint
+      - key: UC_CATALOG
+        value: workspace
+      - key: UC_SCHEMA
+        value: credit_risk
+      - key: DATABRICKS_HOST
         sync: false
-      - key: CORS_ORIGINS
-        value: "https://credit-risk-dashboard.onrender.com"
-      - key: RATE_LIMIT
-        value: "60/minute"
-      - key: DOCS_ENABLED
-        value: "true"
-      # Entrena el modelo en el primer arranque (no se commitea el .joblib
-      # a git a propósito): ver src/ml/bootstrap.py.
-      - key: AUTO_TRAIN_MODEL
-        value: "true"
-      - key: MLFLOW_ALLOW_FILE_STORE
-        value: "true"
-      - key: MODEL_PATH
-        value: data/processed/model.joblib
-      - key: DECISION_THRESHOLD
-        value: "0.5"
+      - key: DATABRICKS_TOKEN
+        sync: false
+      - key: DATABRICKS_WAREHOUSE_ID
+        sync: false
+      - key: API_KEYS
+        generateValue: true
 
   - type: web
     name: credit-risk-dashboard
-    runtime: docker
-    dockerfilePath: ./docker/Dockerfile.app
-    dockerContext: .
+    runtime: python
     plan: free
+    region: oregon
+    buildCommand: pip install -r app/requirements.txt
+    startCommand: streamlit run app/streamlit_app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+    autoDeploy: false
     envVars:
-      # Mismo valor que API_KEY en credit-risk-api (ver nota arriba).
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: API_URL
+        fromService:
+          type: web
+          name: credit-risk-gateway
+          property: host
       - key: API_KEY
-        sync: false
-      - key: API_PUBLIC_URL
-        value: "https://credit-risk-api.onrender.com"
-      - key: MLFLOW_ALLOW_FILE_STORE
-        value: "true"
-      - key: MODEL_PATH
-        value: data/processed/model.joblib
-      - key: DECISION_THRESHOLD
-        value: "0.5"
+        fromService:
+          type: web
+          name: credit-risk-gateway
+          envVarKey: API_KEYS

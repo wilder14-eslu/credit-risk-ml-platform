@@ -1,28 +1,40 @@
-.PHONY: install train test lint run demo monitor monitor-once
+.PHONY: install lint format test cov gateway dashboard validate deploy-dev deploy-prod train-dev monitor-dev drift-demo
 
 install:
-	pip install -r requirements.txt
+	pip install -r requirements-dev.txt
 
-train:
-	python -m src.ml.train
+lint:
+	ruff check . && ruff format --check .
 
-tune:
-	python -m src.ml.tune
-
-run:
-	uvicorn src.api.main:app --reload
-
-demo:
-	streamlit run app.py
+format:
+	ruff format . && ruff check --fix .
 
 test:
 	pytest
 
-lint:
-	ruff check .
+cov:
+	pytest --cov --cov-report=term-missing --cov-report=xml
 
-monitor:
-	python -m src.orchestrator.monitor
+gateway:
+	uvicorn gateway.main:app --reload
 
-monitor-once:
-	python -c "from src.orchestrator.monitor import monitoring_flow; import json; print(json.dumps(monitoring_flow(), indent=2, default=str))"
+dashboard:
+	streamlit run app/streamlit_app.py
+
+validate:
+	databricks bundle validate -t dev
+
+deploy-dev:
+	databricks bundle deploy -t dev
+
+deploy-prod:
+	databricks bundle deploy -t prod
+
+train-dev:
+	databricks bundle run -t dev ct_training_pipeline
+
+monitor-dev:
+	databricks bundle run -t dev production_monitoring
+
+drift-demo:
+	databricks bundle run -t dev production_monitoring --params scenario=mixed,batch_size=3000

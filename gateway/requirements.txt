@@ -1,0 +1,12 @@
+# Dependencias del gateway (Render). Livianas: el modelo corre en Databricks.
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2.7
+pydantic-settings>=2.3
+httpx>=0.27
+pandas>=2.1
+numpy>=1.26
+scipy>=1.11
+scikit-learn>=1.4
+pyyaml>=6.0
+joblib>=1.3

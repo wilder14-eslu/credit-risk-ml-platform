@@ -1,0 +1,7 @@
+# Normaliza finales de línea: evita que Windows marque todo el repo como modificado
+* text=auto eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.png binary
+*.xls binary
+DATA/** -text

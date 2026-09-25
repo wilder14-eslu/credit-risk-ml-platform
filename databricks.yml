@@ -1,0 +1,53 @@
+# Databricks Asset Bundle: define TODA la plataforma en Databricks como código
+# (jobs de CT, monitoreo, A/B y rollback). Compatible con Databricks Free Edition
+# (solo compute serverless). Despliegue: `databricks bundle deploy -t dev|prod`.
+bundle:
+  name: credit-risk-ml-platform
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: Catálogo de Unity Catalog (en Free Edition el catálogo por defecto es `workspace`)
+    default: workspace
+  schema:
+    description: Esquema donde viven tablas, volumen y modelo
+    default: credit_risk
+  deploy_serving:
+    description: Crear/actualizar el endpoint de Model Serving ("true" | "false")
+    default: "true"
+  optuna_trials:
+    description: Intentos de Optuna en el tuning del mejor algoritmo
+    default: "25"
+  git_sha:
+    description: Commit desplegado (lo inyecta el pipeline de CD)
+    default: local
+
+sync:
+  exclude:
+    - ".venv/**"
+    - "gateway/**"
+    - "app/**"
+    - "tests/**"
+    - "docs/**"
+    - ".github/**"
+    - "DATA/processed/**"
+    - "DATA/GiveMeSomeCredit/cs-test.csv"
+    - "DATA/GiveMeSomeCredit/sampleEntry.csv"
+    - "**/__pycache__/**"
+
+targets:
+  dev:
+    mode: development
+    default: true
+    variables:
+      schema: credit_risk_dev
+      optuna_trials: "5"
+
+  prod:
+    mode: production
+    workspace:
+      root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      schema: credit_risk

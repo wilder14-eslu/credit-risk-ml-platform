@@ -1,0 +1,4 @@
+# Entorno local / CI (instala el paquete con todos los extras)
+-e .[ml,databricks,gateway,dev]
+streamlit>=1.38
+plotly>=5.22

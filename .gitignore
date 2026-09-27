@@ -18,3 +18,8 @@ mlruns/
 # Documentos de referencia locales (no redistribuir)
 *.pdf
 *.xlsx
+
+# Herramientas locales
+.claude/
+.agents/
+_claude_tmp/

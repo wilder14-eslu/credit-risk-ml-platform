@@ -2,7 +2,7 @@
 reentrenamiento automático.
 
 Lee directamente los mismos artefactos que usan la API y el flow de
-monitoreo (`src.orchestrator.monitor`): el log de predicciones/resultados
+monitoreo (`src.monitoring.decision`): el log de predicciones/resultados
 (`data/processed/*.jsonl`) y la distribución de referencia que guarda cada
 entrenamiento (`data/processed/reference_distribution.json`). No llama a la
 API por HTTP, igual que `app.py`, para que la demo funcione con un solo
@@ -20,8 +20,8 @@ from src.api.monitoring import (
     load_recent_predictions,
     record_outcome,
 )
+from src.monitoring.decision import decide_retrain
 from src.monitoring.drift import compute_feature_drift, load_reference_distribution
-from src.orchestrator.monitor import decide_retrain
 
 st.set_page_config(
     page_title="Monitoreo · Credit Risk ML Platform", page_icon="📊", layout="centered"
@@ -29,7 +29,7 @@ st.set_page_config(
 st.title("📊 Monitoreo del modelo")
 st.caption(
     "Estado de drift de datos, performance en producción y la señal de "
-    "reentrenamiento que consume `src.orchestrator.monitor.monitoring_flow` "
+    "reentrenamiento que consume el job de monitoreo "
     "(el mismo chequeo que corre solo, cada hora por defecto, en el "
     "servicio `scheduler` del docker-compose)."
 )

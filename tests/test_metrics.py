@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from src.ml.metrics import compute_classification_metrics, diagnose_fit, ks_statistic
 
@@ -14,13 +15,13 @@ def _synthetic_labels_and_scores(n: int = 200, separation: float = 3.0, seed: in
 def test_ks_statistic_is_zero_when_scores_do_not_separate_classes() -> None:
     y_true = np.array([0, 1, 0, 1, 0, 1])
     scores = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
-    assert ks_statistic(y_true, scores) == 0.0
+    assert ks_statistic(y_true, scores) == pytest.approx(0.0)
 
 
 def test_ks_statistic_is_high_when_scores_perfectly_separate_classes() -> None:
     y_true = np.array([0, 0, 0, 1, 1, 1])
     scores = np.array([0.1, 0.2, 0.3, 0.7, 0.8, 0.9])
-    assert ks_statistic(y_true, scores) == 1.0
+    assert ks_statistic(y_true, scores) == pytest.approx(1.0)
 
 
 def test_compute_classification_metrics_has_the_full_panel() -> None:

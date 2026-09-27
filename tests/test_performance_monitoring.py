@@ -1,3 +1,5 @@
+import pytest
+
 from src.api.monitoring import (
     compute_live_performance,
     performance_degraded_trigger,
@@ -44,7 +46,7 @@ def test_compute_live_performance_scores_matched_records(tmp_path) -> None:
     result = compute_live_performance(predictions_path, outcomes_path, min_samples=4)
     assert result["status"] == "ok"
     assert result["n_matched"] == 4
-    assert result["live_roc_auc"] == 1.0
+    assert result["live_roc_auc"] == pytest.approx(1.0)
 
 
 def test_performance_degraded_trigger() -> None:

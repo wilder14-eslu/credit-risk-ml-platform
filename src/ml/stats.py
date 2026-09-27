@@ -321,7 +321,7 @@ def approval_strategy_curve(
     n = len(y_true)
     rows = []
     for rate in approval_rates:
-        k = max(int(round(rate * n)), 1)
+        k = max(round(rate * n), 1)
         rows.append(
             {
                 "approval_rate": float(rate),

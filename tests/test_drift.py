@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from src.monitoring.drift import (
     compute_feature_drift,
@@ -10,7 +11,7 @@ from src.monitoring.drift import (
 
 def test_psi_is_zero_for_identical_distributions() -> None:
     proportions = [0.1, 0.2, 0.3, 0.2, 0.2]
-    assert population_stability_index(proportions, proportions) == 0.0
+    assert population_stability_index(proportions, proportions) == pytest.approx(0.0)
 
 
 def test_psi_is_high_for_shifted_distributions() -> None:

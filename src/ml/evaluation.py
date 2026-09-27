@@ -291,8 +291,8 @@ def run_evaluation(
             "n_features": int(x_dev.shape[1]),
             "features": list(x_dev.columns),
             "prevalence": float(pd.concat([y_dev, y_test]).mean()),
-            "n_dev": int(len(x_dev)),
-            "n_test": int(len(x_test)),
+            "n_dev": len(x_dev),
+            "n_test": len(x_test),
             "test_positives": int(y_test.sum()),
             "cv": {"n_splits": n_splits, "n_repeats": n_repeats, "random_state": 42},
             "n_bootstrap": n_boot,
@@ -374,10 +374,15 @@ def render_markdown(result: dict[str, Any]) -> str:
         "",
         f"_Generado: {meta['generated_at']} con `python -m src.ml.evaluation`_",
         "",
-        f"- Filas: {meta['rows_after_cleaning']:,} | Prevalencia de default: "
-        f"{meta['prevalence']:.2%} | Desarrollo: {meta['n_dev']:,} | Holdout: {meta['n_test']:,}",
-        f"- CV: {meta['cv']['n_splits']} folds x {meta['cv']['n_repeats']} repeticiones "
-        f"(estratificada) | Bootstrap: {meta['n_bootstrap']} remuestras",
+        (
+            f"- Filas: {meta['rows_after_cleaning']:,} | Prevalencia de default: "
+            f"{meta['prevalence']:.2%} | Desarrollo: {meta['n_dev']:,} | "
+            f"Holdout: {meta['n_test']:,}"
+        ),
+        (
+            f"- CV: {meta['cv']['n_splits']} folds x {meta['cv']['n_repeats']} repeticiones "
+            f"(estratificada) | Bootstrap: {meta['n_bootstrap']} remuestras"
+        ),
         f"- Champion (por ROC-AUC medio en CV): **{DISPLAY_NAMES[champion]}**",
         "",
         "## Validación cruzada (media ± desv. estándar [IC 95 % t corregido Nadeau-Bengio])",
@@ -405,8 +410,10 @@ def render_markdown(result: dict[str, Any]) -> str:
             f"{d['diff']:+.4f} | {d['p_value']:.3g} |"
         )
     lines += ["", "## Holdout (20 %, evaluado una sola vez)", "",
-              "| Modelo | ROC-AUC [IC 95 % DeLong] | PR-AUC [IC boot] | KS [IC boot] | Brier | "
-              "ECE | Pendiente calib. | Latencia p50 (ms) |",
+              (
+                  "| Modelo | ROC-AUC [IC 95 % DeLong] | PR-AUC [IC boot] | KS [IC boot] | "
+                  "Brier | ECE | Pendiente calib. | Latencia p50 (ms) |"
+              ),
               "|---|---|---|---|---|---|---|---|"]
     for a in order:
         h = result["holdout"][a]
@@ -426,10 +433,17 @@ def render_markdown(result: dict[str, Any]) -> str:
         "",
         "## Umbral de decisión",
         "",
-        f"- Elegido en predicciones out-of-fold (costo FN:FP = {th['cost_fn']:g}:{th['cost_fp']:g}): "
-        f"**{th['selected_threshold']:.3f}** (umbral bayesiano teórico {th['bayes_threshold']:.3f})",
-        f"- Holdout con ese umbral: precisión {sel['precision']:.3f}, recall {sel['recall']:.3f}, "
-        f"F1 {sel['f1']:.3f}, tasa de rechazo {th['holdout_rejection_rate_at_selected']:.1%}",
+        (
+            "- Elegido en predicciones out-of-fold "
+            f"(costo FN:FP = {th['cost_fn']:g}:{th['cost_fp']:g}): "
+            f"**{th['selected_threshold']:.3f}** "
+            f"(umbral bayesiano teórico {th['bayes_threshold']:.3f})"
+        ),
+        (
+            f"- Holdout con ese umbral: precisión {sel['precision']:.3f}, "
+            f"recall {sel['recall']:.3f}, F1 {sel['f1']:.3f}, "
+            f"tasa de rechazo {th['holdout_rejection_rate_at_selected']:.1%}"
+        ),
         "",
         "## Tabla de deciles (holdout, champion)",
         "",

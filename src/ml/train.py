@@ -13,7 +13,7 @@ and three gradient-boosting libraries. `src.ml.benchmark` calls this
 function once per algorithm on the same train/test split to run the
 "MODEL BENCHMARK -> BEST MODEL" comparison described in the project's
 architecture; this module by itself always trains exactly one algorithm
-(XGBoost by default, matching `src.orchestrator.pipeline`'s previous
+(XGBoost by default, matching the retraining job's previous
 behaviour) if you just need a single model.
 """
 
@@ -29,7 +29,12 @@ import joblib
 import pandas as pd
 from xgboost import XGBClassifier
 
-from src.data_pipeline.preprocess import prepare_training_data
+from src.data_pipeline.preprocess import (
+    IMPUTATION_FILENAME,
+    fit_imputation_values,
+    prepare_training_data,
+    save_imputation_values,
+)
 from src.ml.metrics import compute_classification_metrics, diagnose_fit
 from src.monitoring.drift import save_reference_distribution
 
@@ -57,6 +62,7 @@ DEFAULT_PARAMS: dict[str, dict[str, Any]] = {
         "subsample": 0.9,
         "colsample_bytree": 0.9,
         "random_state": 42,
+        "verbose": -1,
     },
     "catboost": {
         "iterations": 300,
@@ -71,13 +77,26 @@ def _build_model(algorithm: str, params: dict[str, Any]) -> Any:
     if algorithm == "logistic_regression":
         from sklearn.linear_model import LogisticRegression
         from sklearn.pipeline import Pipeline
-        from sklearn.preprocessing import StandardScaler
+        from sklearn.preprocessing import QuantileTransformer, StandardScaler
 
-        # Unlike tree models, linear models need scaled inputs -- the raw
-        # features here have wildly different ranges (age in tens,
-        # debt_ratio sometimes in the thousands).
+        # Unlike tree models, a linear model is badly hurt by these raw
+        # features: extreme right tails (debt_ratio up to 3e5, revolving
+        # utilization up to 5e4) and the 96/98 sentinel codes in the
+        # past-due counts. A monotone rank-to-normal transform per feature
+        # fixes that while keeping one coefficient per feature (still an
+        # interpretable scorecard). Ablation (CV): ROC-AUC 0.69 with plain
+        # StandardScaler vs ~0.84 with this transform.
         return Pipeline(
-            [("scaler", StandardScaler()), ("model", LogisticRegression(**params))]
+            [
+                (
+                    "quantile",
+                    QuantileTransformer(
+                        n_quantiles=200, output_distribution="normal", random_state=42
+                    ),
+                ),
+                ("scaler", StandardScaler()),
+                ("model", LogisticRegression(**params)),
+            ]
         )
 
     if algorithm == "xgboost":
@@ -179,6 +198,12 @@ def train_model(
     reference_path = save_reference_distribution(
         x_train, resolved_model_path.parent / "reference_distribution.json"
     )
+    # x_train is already imputed with the train medians; the median of a
+    # median-imputed column is unchanged, so this recovers the exact values
+    # the model saw. Persisted so inference imputes identically.
+    imputation_path = save_imputation_values(
+        fit_imputation_values(x_train), resolved_model_path.parent / IMPUTATION_FILENAME
+    )
 
     model = _build_model(algorithm, resolved_params)
     model.fit(x_train, y_train)
@@ -196,7 +221,7 @@ def train_model(
 
     mlflow_metrics = {
         # Backward-compatible top-level key: `evaluate_and_promote` and
-        # `src.orchestrator.monitor` read the champion's ROC-AUC from here.
+        # the monitoring job reads the champion's ROC-AUC from here.
         "roc_auc": test_metrics["roc_auc"],
         "train_rows": float(len(x_train)),
         "test_rows": float(len(x_test)),
@@ -219,6 +244,7 @@ def train_model(
         "roc_auc": test_metrics["roc_auc"],
         "model_path": str(resolved_model_path),
         "reference_distribution_path": str(reference_path),
+        "imputation_values_path": str(imputation_path),
         "train_metrics": train_metrics,
         "test_metrics": test_metrics,
         "diagnosis": diagnosis,

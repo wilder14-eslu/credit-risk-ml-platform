@@ -10,7 +10,7 @@ does not automatically win.
 
 Run with:
     python -m src.ml.benchmark
-or from the automated retraining flow (`src.orchestrator.pipeline`), which
+or from the automated retraining job, which
 runs this on every scheduled retrain and only sends the winner through the
 `evaluate_and_promote` champion/challenger gate.
 """

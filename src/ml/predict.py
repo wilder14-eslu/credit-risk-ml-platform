@@ -15,6 +15,11 @@ from typing import Any
 import joblib
 import pandas as pd
 
+from src.data_pipeline.preprocess import (
+    IMPUTATION_FILENAME,
+    apply_imputation,
+    load_imputation_values,
+)
 from src.feature_store.features import FEATURE_NAMES, build_features
 
 DEFAULT_MODEL_PATH = "data/processed/model.joblib"
@@ -62,10 +67,20 @@ def risk_band(probability: float) -> str:
     return "alto"
 
 
-def _build_applicant_features(applicant: dict[str, Any]) -> pd.DataFrame:
+def _build_applicant_features(
+    applicant: dict[str, Any], model_path: Path | str | None = None
+) -> pd.DataFrame:
+    """Canonical single-row feature matrix.
+
+    Missing fields are imputed with the **training** medians saved next to
+    the model (``imputation_values.json``), so a missing income is filled
+    exactly as it was during training (no train/serve skew). Artifacts
+    trained before that file existed fall back to 0.0.
+    """
     raw = pd.DataFrame([applicant])
     features = build_features(raw)
-    features = features.fillna(features.median(numeric_only=True)).fillna(0.0)
+    values = load_imputation_values(_resolve_model_path(model_path).parent / IMPUTATION_FILENAME)
+    features = apply_imputation(features, values or {})
     return features[list(FEATURE_NAMES)]
 
 
@@ -83,7 +98,7 @@ def predict_default_probability(
     resolved_threshold = (
         threshold if threshold is not None else float(os.getenv("DECISION_THRESHOLD", "0.5"))
     )
-    features = _build_applicant_features(applicant)
+    features = _build_applicant_features(applicant, model_path)
 
     model = load_model(model_path)
     probability = _predict_proba(model, features)

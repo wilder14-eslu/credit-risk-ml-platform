@@ -1,4 +1,4 @@
-from src.orchestrator.monitor import decide_retrain
+from src.monitoring.decision import decide_retrain
 
 
 def test_decide_retrain_true_when_any_trigger_fires() -> None:

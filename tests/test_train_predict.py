@@ -24,6 +24,8 @@ def test_train_and_predict_roundtrip(tmp_path) -> None:
     metrics = train_model(raw_data, model_path=model_path, register=False)
     assert 0.0 <= metrics["roc_auc"] <= 1.0
     assert model_path.is_file()
+    # Train medians are persisted next to the model for skew-free inference.
+    assert (tmp_path / "imputation_values.json").is_file()
 
     applicant = {
         "RevolvingUtilizationOfUnsecuredLines": 0.3,
@@ -41,3 +43,8 @@ def test_train_and_predict_roundtrip(tmp_path) -> None:
     assert 0.0 <= result["probability"] <= 1.0
     assert result["decision"] in {"aprobar", "rechazar"}
     assert result["risk_band"] in {"bajo", "medio", "alto"}
+
+    # A missing income is imputed with the training median, not with 0.
+    missing_income = {**applicant, "MonthlyIncome": None}
+    imputed = predict_default_probability(missing_income, model_path=model_path)
+    assert imputed["features"]["monthly_income"] > 0

@@ -99,7 +99,7 @@ def compute_feature_drift(
 
     Returns per-feature PSI plus an overall ``drift_detected`` flag (any
     feature above ``psi_threshold``). This is the "Data Drift" box in the
-    platform's monitoring diagram; `src.orchestrator.monitor.monitoring_flow`
+    platform's monitoring diagram; the monitoring job
     uses ``drift_detected`` to decide whether to trigger a retraining run.
     """
     if recent_features.empty:

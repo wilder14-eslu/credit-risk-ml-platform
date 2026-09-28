@@ -8,7 +8,7 @@
 ![MLflow](https://img.shields.io/badge/MLflow-0194E2?logo=mlflow&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?logo=streamlit&logoColor=white)
 
-Plataforma de **probabilidad de incumplimiento (PD)** de extremo a extremo:
+Plataforma de **probabilidad de incumplimiento (PD)** de End-to-End:
 del dato crudo a una API de scoring y una demo web, con benchmark de 4
 algoritmos, validación estadística rigurosa, explicabilidad (SHAP),
 monitoreo de drift y reentrenamiento automático. Construida como ejercicio

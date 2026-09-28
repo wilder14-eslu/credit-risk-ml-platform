@@ -489,7 +489,7 @@ python -m src.ml.evaluation           # 1. Evaluación completa y figuras del RE
 python -m src.ml.benchmark            # 2. Benchmark rápido de los 4 algoritmos (no registra nada)
 python -m src.ml.train                # 3. Entrena y registra el modelo, guarda informe MD + PDF
 uvicorn src.api.main:app --reload     # 4a. API
-streamlit run app.py                  # 4b. Demo (incluye el panel "📊 Monitoreo")
+streamlit run app.py                  # 4b. Demo (incluye el panel "Monitoreo")
 ```
 
 Atajos: `make install | evaluate | evaluate-quick | benchmark | train | run | demo | test | lint`.
@@ -550,7 +550,7 @@ Reportar el resultado real meses después: `POST /api/v1/outcomes` con
 
 Formulario con los mismos campos que la API (descripciones tomadas de
 `config/data_schema.yaml`), que muestra probabilidad, decisión, banda de
-riesgo y factores SHAP. La página **📊 Monitoreo** muestra predicciones
+riesgo y factores SHAP. La página **Monitoreo** muestra predicciones
 registradas, tasa de rechazo, PSI por feature, AUC en vivo y si se
 disparará el reentrenamiento.
 

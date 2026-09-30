@@ -401,7 +401,7 @@ credit-risk-ml-platform/
 
 Para probarla: abre [`/docs`](https://credit-risk-api-mdix.onrender.com/docs), ejecuta `GET /api/v1/features` y luego `POST /api/v1/predict` con "Try it out".
 
-## Resumen para portafolio
+## Resumen
 
 Plataforma de riesgo de crédito orientada a producción que estima la probabilidad de default con CatBoost, XGBoost, LightGBM, regresión logística y un scorecard WoE tradicional. Los compara con inferencia estadística rigurosa (DeLong, Nadeau-Bengio, Holm, CV anidada con Optuna) y traduce el modelo en decisiones con umbrales por costos, análisis de cartera y stress testing. Incluye explicabilidad SHAP, diagnóstico de equidad, monitoreo de deriva sin despliegue automático, Model Card y Data Card, una API FastAPI desplegada y 96 tests con CI. Documenta explícitamente lo que el dataset no permite hacer: validación fuera de tiempo, inferencia de rechazados y LGD/EAD.
 

@@ -27,8 +27,8 @@ def test_holm_rejects_invalid_input() -> None:
 
 
 def test_cohens_dz_and_degenerate_cases() -> None:
-    assert paired_cohens_dz([1.0, 1.0, 1.0]) == 0.0
-    assert paired_cohens_dz([1.0]) == 0.0
+    assert paired_cohens_dz([1.0, 1.0, 1.0]) == pytest.approx(0.0)
+    assert paired_cohens_dz([1.0]) == pytest.approx(0.0)
     assert paired_cohens_dz([1.0, 2.0, 3.0]) == pytest.approx(2.0)
 
 

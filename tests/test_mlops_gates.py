@@ -35,7 +35,7 @@ def test_gate_rejects_regression_without_touching_registry() -> None:
 def test_evaluating_an_improvement_never_promotes_by_itself() -> None:
     client = FakeClient(current_auc=0.8)
     verdict = evaluate_candidate(0.81, client=client)
-    assert verdict["eligible"] and verdict["champion_roc_auc"] == 0.8
+    assert verdict["eligible"] and verdict["champion_roc_auc"] == pytest.approx(0.8)
     assert not client.transitioned  # elegible no significa desplegado
 
 

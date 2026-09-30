@@ -50,8 +50,8 @@ def render_model_card(metrics: dict[str, Any], results: dict[str, Any]) -> str:
         "| Modelo servido por la demo/API | XGBoost (valor por defecto de `src/ml/train.py`) |",
         "| Benchmark interpretable | Scorecard WoE + regresión logística (`src/risk/scorecard.py`) |",
         "| Salida | Probabilidad de default a 2 años (`SeriousDlqin2yrs`) |",
-        f"| Umbral de decisión | {th['selected_threshold']:.3f} (mínimo costo, FN:FP = "
-        f"{th['cost_fn']:g}:{th['cost_fp']:g}, elegido con predicciones out-of-fold) |",
+        (f"| Umbral de decisión | {th['selected_threshold']:.3f} (mínimo costo, FN:FP = "
+        f"{th['cost_fn']:g}:{th['cost_fp']:g}, elegido con predicciones out-of-fold) |"),
         f"| Versión de código | {_commit(prov)} |",
         f"| Dataset | `{prov['dataset']['path']}` sha256 `{prov['dataset']['sha256'][:16]}...` |",
         f"| Generada | {prov['generated_at']} · Python {prov['python']} |",
@@ -59,16 +59,16 @@ def render_model_card(metrics: dict[str, Any], results: dict[str, Any]) -> str:
         "",
         "## 2. Uso previsto",
         "",
-        "- Proyecto de portafolio que demuestra metodología de riesgo de crédito, validación "
-        "estadística y MLOps sobre un dataset público.",
+        ("- Proyecto de portafolio que demuestra metodología de riesgo de crédito, validación "
+        "estadística y MLOps sobre un dataset público."),
         "- Ordenar solicitantes por riesgo y estimar una PD calibrada para análisis de escenarios.",
         "",
         "## 3. Fuera de alcance",
         "",
-        "- Decisiones de crédito reales sobre personas: el modelo no fue validado por un área de "
-        "riesgo de modelos ni aprobado por un regulador.",
-        "- Cálculo de provisiones o capital regulatorio (no hay LGD, EAD ni validación fuera de "
-        "tiempo).",
+        ("- Decisiones de crédito reales sobre personas: el modelo no fue validado por un área de "
+        "riesgo de modelos ni aprobado por un regulador."),
+        ("- Cálculo de provisiones o capital regulatorio (no hay LGD, EAD ni validación fuera de "
+        "tiempo)."),
         "- Poblaciones distintas a la del dataset (otro país, producto o período).",
         "",
         "## 4. Desempeño (holdout 20 %, evaluado una sola vez)",
@@ -88,13 +88,13 @@ def render_model_card(metrics: dict[str, Any], results: dict[str, Any]) -> str:
         )
     sauc = card["auc_delong"]
     lines += [
-        f"| Scorecard WoE | {sauc['auc']:.4f} [{sauc['ci_low']:.4f}, {sauc['ci_high']:.4f}] | "
+        (f"| Scorecard WoE | {sauc['auc']:.4f} [{sauc['ci_low']:.4f}, {sauc['ci_high']:.4f}] | "
         f"{card['pr_auc']:.4f} | {card['ks']:.4f} | {card['brier']:.4f} | {card['ece']:.4f} | "
-        f"{card['calibration']['slope']:.3f} |",
+        f"{card['calibration']['slope']:.3f} |"),
         "",
-        f"Con el umbral elegido, el champion detecta {_pct(sel['recall'])} de los defaults con "
+        (f"Con el umbral elegido, el champion detecta {_pct(sel['recall'])} de los defaults con "
         f"precisión {_pct(sel['precision'])} y rechaza {_pct(th['holdout_rejection_rate_at_selected'])} "
-        "de las solicitudes del holdout.",
+        "de las solicitudes del holdout."),
         "",
         "## 5. Equidad (solo edad disponible)",
         "",
@@ -143,8 +143,8 @@ def render_model_card(metrics: dict[str, Any], results: dict[str, Any]) -> str:
     if cc:
         lines += [
             f"- Champion vigente: {cc['champion']} · Challenger: {cc['challenger']}",
-            f"- Δ AUC (challenger - champion) = {cc['auc_difference']:+.4f}, "
-            f"p DeLong = {cc['p_value_delong']:.3g}, margen práctico = {cc['practical_margin']}",
+            (f"- Δ AUC (challenger - champion) = {cc['auc_difference']:+.4f}, "
+            f"p DeLong = {cc['p_value_delong']:.3g}, margen práctico = {cc['practical_margin']}"),
             f"- Recomendación: **{cc['recommendation']}**",
             "- `auto_promote = False`: ninguna promoción ocurre sin aprobación humana.",
         ]
@@ -152,12 +152,12 @@ def render_model_card(metrics: dict[str, Any], results: dict[str, Any]) -> str:
         "",
         "## 9. Monitoreo y política de reentrenamiento",
         "",
-        "- Calidad de datos (faltantes, esquema, valores inválidos), deriva de variables (PSI), "
+        ("- Calidad de datos (faltantes, esquema, valores inválidos), deriva de variables (PSI), "
         "deriva de predicciones (PSI del score), deriva de desempeño (AUC, PR-AUC, KS, Brier, "
-        "calibración) y deriva de negocio (aprobación, composición de cartera, default observado).",
-        "- Las señales solo abren un **candidato de reentrenamiento**. La deriva nunca despliega "
+        "calibración) y deriva de negocio (aprobación, composición de cartera, default observado)."),
+        ("- Las señales solo abren un **candidato de reentrenamiento**. La deriva nunca despliega "
         "un modelo: la promoción requiere `approved_by` (ver "
-        "`docs/governance/RETRAINING_POLICY.md`).",
+        "`docs/governance/RETRAINING_POLICY.md`)."),
         "",
         "## 10. Limitaciones",
         "",
@@ -192,8 +192,8 @@ def render_data_card(results: dict[str, Any]) -> str:
         f"| Filas tras limpieza | {data['rows']:,} (se descarta 1 fila con edad fuera de rango) |",
         f"| Variables | {data['n_features']} numéricas |",
         f"| Objetivo | `{data['target_source']}`: atraso de 90+ días en los 2 años siguientes |",
-        f"| Prevalencia de default | {_pct(data['default_prevalence'], 2)} ({data['defaults']:,} "
-        "defaults) |",
+        (f"| Prevalencia de default | {_pct(data['default_prevalence'], 2)} ({data['defaults']:,} "
+        "defaults) |"),
         f"| Filas duplicadas | {data['duplicate_rows']:,} (se conservan) |",
         f"| Variable temporal | {data['temporal_variable'] or 'ninguna (no es posible validar fuera de tiempo)'} |",
         "| Población rechazada | no incluida (no es posible inferencia de rechazados) |",
@@ -222,12 +222,12 @@ def render_data_card(results: dict[str, Any]) -> str:
         "",
         "## Consideraciones",
         "",
-        "- `age` es un atributo potencialmente protegido en regulación de crédito; se usa como "
-        "variable del modelo y como único eje de diagnóstico de equidad.",
-        "- `MonthlyIncome` y `NumberOfDependents` tienen faltantes: se imputan con medianas "
-        "ajustadas solo en entrenamiento (modelos ML) o forman un bin propio (scorecard).",
-        "- Colas extremas en `DebtRatio` y `RevolvingUtilizationOfUnsecuredLines`: robustas en "
-        "árboles; la regresión logística usa transformación por cuantiles y el scorecard bins.",
+        ("- `age` es un atributo potencialmente protegido en regulación de crédito; se usa como "
+        "variable del modelo y como único eje de diagnóstico de equidad."),
+        ("- `MonthlyIncome` y `NumberOfDependents` tienen faltantes: se imputan con medianas "
+        "ajustadas solo en entrenamiento (modelos ML) o forman un bin propio (scorecard)."),
+        ("- Colas extremas en `DebtRatio` y `RevolvingUtilizationOfUnsecuredLines`: robustas en "
+        "árboles; la regresión logística usa transformación por cuantiles y el scorecard bins."),
         "- Licencia: términos de la competencia de Kaggle; revisar antes de redistribuir.",
         "",
     ]

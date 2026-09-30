@@ -27,7 +27,7 @@ def paired_cohens_dz(differences: Sequence[float]) -> float:
     if d.size < 2:
         return 0.0
     std = float(d.std(ddof=1))
-    if std == 0.0:
+    if np.isclose(std, 0.0):
         return 0.0
     return float(d.mean() / std)
 

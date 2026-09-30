@@ -81,7 +81,7 @@ def test_points_table_reconstructs_score() -> None:
     }
     row = x.iloc[[0]]
     total = sum(
-        points[(name, int(scorecard.binnings[name].assign(row[name])[0]))]
+        points[name, int(scorecard.binnings[name].assign(row[name])[0])]
         for name in scorecard.features
     )
     assert total == pytest.approx(float(scorecard.score(row)[0]), abs=1e-6)

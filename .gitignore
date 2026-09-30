@@ -23,3 +23,6 @@ mlruns/
 .claude/
 .agents/
 _claude_tmp/
+
+# Salidas de pruebas rápidas (no son resultados reportables)
+reports_quick/

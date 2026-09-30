@@ -1,612 +1,423 @@
 # Credit Risk ML Platform
 
+**Plataforma end-to-end de probabilidad de default (PD) que combina metodología de riesgo de crédito, inferencia estadística, machine learning explicable y MLOps orientado a producción**, construida sobre el dataset público [Give Me Some Credit](https://www.kaggle.com/c/GiveMeSomeCredit) (150,000 solicitantes).
+
 [![CI/CD](https://github.com/wilder14-eslu/credit-risk-ml-platform/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/wilder14-eslu/credit-risk-ml-platform/actions/workflows/ci-cd.yml)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![scikit-learn](https://img.shields.io/badge/scikit--learn-F7931E?logo=scikitlearn&logoColor=white)
-![CatBoost | XGBoost | LightGBM](https://img.shields.io/badge/CatBoost%20%7C%20XGBoost%20%7C%20LightGBM-boosting-2a78d6)
-![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![Boosting](https://img.shields.io/badge/CatBoost%20%7C%20XGBoost%20%7C%20LightGBM-boosting-2a78d6)
+![Optuna](https://img.shields.io/badge/Optuna-nested%20CV-4a3aa7)
+![SHAP](https://img.shields.io/badge/SHAP-explicabilidad-6b6a66)
 ![MLflow](https://img.shields.io/badge/MLflow-0194E2?logo=mlflow&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?logo=streamlit&logoColor=white)
 
-Plataforma de **probabilidad de incumplimiento (PD)** de End-to-End:
-del dato crudo a una API de scoring y una demo web, con benchmark de 4
-algoritmos, validación estadística rigurosa, explicabilidad (SHAP),
-monitoreo de drift y reentrenamiento automático. Construida como ejercicio
-de **MLOps de nivel bancario** sobre el dataset
-[Give Me Some Credit](https://www.kaggle.com/c/GiveMeSomeCredit) (150,000
-solicitantes, Kaggle).
+**Stack realmente implementado:** Python · pandas · scikit-learn · CatBoost · XGBoost · LightGBM · Optuna · SciPy · SHAP · MLflow · FastAPI · Streamlit · pytest · Ruff · GitHub Actions · Render
 
-**Demo en vivo:** https://credit-risk-ml-platform-xk4rsvntltadpumscgcwko.streamlit.app/
+**Demo en vivo:** [dashboard (Streamlit)](https://credit-risk-ml-platform-xk4rsvntltadpumscgcwko.streamlit.app/) · [API REST, Swagger](https://credit-risk-api-mdix.onrender.com/docs)
+
+> La API está en el plan gratuito de Render y se suspende tras un periodo de inactividad: la primera petición puede tardar cerca de un minuto; las siguientes son inmediatas.
 
 ---
 
-## Resumen ejecutivo
+## Resultados clave
 
-| | Resultado (holdout de 30,000 solicitantes, nunca usado para elegir nada) |
+Holdout de 30,000 solicitantes (20 %), **aislado**: no se usó para elegir modelo, umbral ni hiperparámetros.
+
+| | Resultado |
 |---|---|
-| **Discriminación** | ROC-AUC **0.870** [IC 95 % 0.862-0.879] · Gini **0.741** · KS **0.582** |
-| **Clase minoritaria** | PR-AUC **0.407**, 6.1 veces la línea base aleatoria (prevalencia 6.68 %) |
-| **Calibración** | Brier **0.0487** · ECE **0.0027** · pendiente de calibración **1.02** (ideal = 1) |
-| **Estabilidad (CV 5x3)** | ROC-AUC **0.865 ± 0.005**; brecha train-validación **+0.008** (sin sobreajuste) |
-| **Valor de negocio** | Con el umbral elegido se detecta el **58 %** de los defaults rechazando solo el **10.7 %** de solicitudes; el decil de mayor riesgo concentra el **56 %** de los defaults (lift 5.6x) |
-| **Costo esperado** | **-38 %** frente a aprobar a todos y **-25 %** frente al umbral por defecto de 0.5 (costo FN:FP = 5:1) |
-| **Cartera aprobada** | Aprobando el 80 % de menor riesgo, la tasa de default baja de 6.68 % a **2.21 %** (-67 %) |
-| **Latencia** | **0.41 ms** p50 por solicitante (inferencia de una fila, CPU) |
+| **Discriminación (champion CatBoost)** | ROC-AUC **0.870** [IC 95 % DeLong 0.862-0.879] · Gini **0.741** · KS **0.582** |
+| **Clase minoritaria** | PR-AUC **0.407**, 6.1 veces la línea base (prevalencia 6.68 %) |
+| **Calibración** | Brier **0.0487** · ECE **0.0027** · pendiente **1.02** (ideal 1) |
+| **Scorecard tradicional (WoE)** | ROC-AUC **0.859**: 1.1 puntos por debajo del ML (diferencia significativa, p Holm < 0.001) |
+| **CV anidada + Optuna** | El tuning **no mejora** de forma relevante a CatBoost ni a XGBoost (Δ AUC ≤ 0.0003, p > 0.2); solo LightGBM mejora (+0.0019, p = 0.035) |
+| **Estabilidad** | ROC-AUC de CatBoost con 10 semillas: 0.8655 ± 0.0032 (IQR 0.0015) |
+| **Decisión** | Con el umbral de mínimo costo (FN:FP = 5:1) se detecta el **58 %** de los defaults rechazando el **10.7 %** de solicitudes |
+| **Cartera** | El 10 % más riesgoso concentra el **56 %** de los defaults (lift 5.6x) |
 
-![Curvas ROC y Precision-Recall en holdout](docs/images/results/02_roc_pr.png)
+![Scorecard tradicional vs modelos de ML](reports/figures/11_scorecard_vs_ml.png)
 
-> Todas las cifras de este README salen de un único comando reproducible,
-> `make evaluate` (`python -m src.ml.evaluation`), que regenera las figuras
-> de `docs/images/results/`, el JSON completo `docs/results/metrics.json` y
-> el informe auto-generado `docs/results/evaluation_report.md`.
+Todas las cifras salen de dos comandos reproducibles (`make nested-cv` y `make report`) y quedan en [`reports/`](reports/): `metrics.json`, `results.json`, `nested_cv.json`, 26 figuras, [`MODEL_CARD.md`](reports/MODEL_CARD.md) y [`DATA_CARD.md`](reports/DATA_CARD.md).
 
-## Contenido
-
-1. [Problema y datos](#1-problema-y-datos)
-2. [Protocolo de evaluación](#2-protocolo-de-evaluación)
-3. [Resultados de los modelos](#3-resultados-de-los-modelos)
-4. [De métricas a decisiones de negocio](#4-de-métricas-a-decisiones-de-negocio)
-5. [Latencia y costo computacional](#5-latencia-y-costo-computacional)
-6. [Decisión de modelo](#6-decisión-de-modelo)
-7. [Limitaciones y riesgo de modelo](#7-limitaciones-y-riesgo-de-modelo)
-8. [Mejoras incorporadas en esta versión](#8-mejoras-incorporadas-en-esta-versión)
-9. [Arquitectura MLOps](#9-arquitectura-mlops)
-10. [Uso: inicio rápido, API y demo](#10-uso-inicio-rápido-api-y-demo)
-11. [Pruebas, CI/CD y reproducibilidad](#11-pruebas-cicd-y-reproducibilidad)
-12. [Referencias](#12-referencias)
-
----
-
-## 1. Problema y datos
-
-**Objetivo:** estimar `P(default)`, donde default = `SeriousDlqin2yrs`
-(atraso de 90 días o más en los próximos 2 años). La salida es una
-probabilidad calibrada, no solo una etiqueta, porque en crédito la PD
-alimenta precio, límite y provisiones, no solo aprobar o rechazar.
-
-| Característica | Valor |
-|---|---|
-| Filas | 150,000 (149,999 tras eliminar 1 fila con edad 0) |
-| Prevalencia de default | **6.68 %** (desbalance ~1:14) |
-| Features | 10 numéricas (utilización revolvente, edad, atrasos 30-59/60-89/90+ días, ratio de deuda, ingreso, líneas abiertas, préstamos hipotecarios, dependientes) |
-| Esquema | `config/data_schema.yaml`: fuente única de verdad para entrenamiento, API y demo |
-
-**Hallazgos de calidad de datos** (relevantes para cualquier revisor):
-
-| Problema | Magnitud | Tratamiento |
-|---|---|---|
-| `MonthlyIncome` faltante | 19.8 % | Imputación por mediana **ajustada solo en train** y persistida para inferencia |
-| `NumberOfDependents` faltante | 2.6 % | Igual que arriba |
-| Códigos centinela 96/98 en los tres conteos de atraso | 269 filas, **54.6 % de default** | Se conservan: los árboles los aíslan; para la Regresión Logística se aplica una transformación por cuantiles |
-| Colas extremas | `DebtRatio` hasta 329,664; `RevolvingUtilization` hasta 50,708 (2.2 % > 1) | Robusto en árboles; transformación a normal por cuantiles en la LR |
-| Filas duplicadas | 609 | Se conservan (perfiles idénticos plausibles); documentado como limitación |
-| Edad fuera de rango | 1 fila (edad 0) | Eliminada por el gate de calidad (`clean_out_of_range_rows`) |
-
-## 2. Protocolo de evaluación
+## Arquitectura
 
 ```mermaid
-flowchart LR
-    A[150k filas limpias] --> B{Split estratificado 80/20<br/>seed 42}
-    B -->|80 % desarrollo| C[CV estratificada repetida<br/>5 folds x 3 repeticiones<br/>imputación dentro de cada fold]
-    B -->|20 % holdout| H[(Holdout<br/>se toca una sola vez)]
-    C --> D[Champion = mayor ROC-AUC medio en CV<br/>+ test de Nadeau-Bengio]
-    C --> E[Predicciones out-of-fold<br/>-> elección del umbral]
-    D --> F[Reentrenar en todo el desarrollo]
-    F --> H
-    H --> G[IC DeLong y bootstrap, test DeLong,<br/>calibración, deciles, latencia]
+flowchart TD
+    A[CSV crudo<br/>Give Me Some Credit] --> B[Validación de datos<br/>esquema, rangos, centinelas]
+    B --> C[Feature store<br/>transformación única train = serving]
+    C --> D{Split estratificado 80/20<br/>seed 42}
+    D -->|80 % desarrollo| E[CV repetida 5x3<br/>imputación dentro de cada fold]
+    D -->|80 % desarrollo| F[CV anidada<br/>Optuna en CV interna]
+    D -->|20 % holdout aislado| H[(Holdout<br/>se mide una sola vez)]
+    E --> G[Validación estadística<br/>Nadeau-Bengio, DeLong, Holm,<br/>calibración, umbral OOF]
+    F --> G
+    G --> I[MLflow<br/>tracking + Model Registry]
+    I --> J[FastAPI + Streamlit<br/>PD, decisión, factores SHAP]
+    J --> K[Monitoreo<br/>calidad, PSI, predicción,<br/>desempeño, negocio]
+    K --> L[Candidato de reentrenamiento]
+    L --> M{Champion vs challenger<br/>+ aprobación humana}
+    M -.->|nunca automático| I
 ```
 
-Decisiones de diseño y su justificación:
+La deriva **nunca** despliega un modelo: solo abre un candidato de reentrenamiento, y la promoción exige `approved_by` ([política](docs/governance/RETRAINING_POLICY.md)).
 
-- **El holdout no participa en ninguna decisión.** El champion se elige
-  por CV y el umbral con predicciones *out-of-fold*; el holdout solo mide.
-  Así su estimación no tiene sesgo optimista por selección.
-- **Mismos folds para todos los modelos**, lo que permite comparaciones
-  pareadas. 3 repeticiones reducen la varianza de la estimación de CV.
-- **Sin fuga de información:** la imputación se ajusta dentro de cada fold
-  (`Pipeline` con `SimpleImputer`) y, en producción, solo con el split de
-  entrenamiento.
-- **Inferencia estadística correcta para CV:** los folds comparten filas de
-  entrenamiento, así que sus métricas están correlacionadas y el t-test
-  ingenuo es anti-conservador. Se usa la **corrección de Nadeau y Bengio
-  (2003)**, varianza `(1/J + n_val/n_fit) * s^2`, tanto para los intervalos
-  de confianza como para los tests entre modelos.
-- **Holdout:** IC del ROC-AUC y test entre modelos con **DeLong (1988)**
-  (algoritmo rápido de Sun y Xu, 2014); IC de PR-AUC, KS y Brier con
-  **bootstrap percentil** de 1,000 remuestras.
-- **Métricas elegidas por su función**, no por costumbre:
-  - *Ordenamiento:* ROC-AUC, Gini (= 2·AUC - 1) y KS, estándares de la
-    industria de scoring.
-  - *Clase minoritaria:* PR-AUC (Average Precision), más informativa que
-    ROC-AUC con 6.7 % de positivos.
-  - *Calibración:* Brier, log loss, ECE y pendiente/intercepto de
-    calibración; imprescindibles si la PD se usa para precio o provisiones.
-  - *Accuracy no se reporta:* un modelo que aprueba a todos obtiene 93.3 %.
-- **Hiperparámetros por defecto razonables, sin tuning** (ver
-  `DEFAULT_PARAMS` en `src/ml/train.py`): el benchmark compara familias de
-  modelos en igualdad de condiciones.
+## Inicio rápido
 
-## 3. Resultados de los modelos
+```bash
+python -m venv .venv
+source .venv/bin/activate            # Windows: .\.venv\Scripts\Activate.ps1
+make setup                           # pip install -r requirements.txt
+make test                            # 96 tests (pytest)
+make nested-cv                       # CV anidada con Optuna -> reports/nested_cv.json (~35 min)
+make report                          # reporte completo -> reports/ (~10 min)
+make api                             # API en http://127.0.0.1:8000/docs
+make demo                            # dashboard Streamlit
+```
 
-### 3.1 Validación cruzada (5 folds x 3 repeticiones, 15 evaluaciones por modelo)
+---
 
-Media ± desviación estándar entre folds [IC 95 % t con corrección de Nadeau-Bengio].
+## Qué demuestra este proyecto
 
-| Modelo | ROC-AUC | PR-AUC | KS | Gini | Brier | Log loss | ECE | AUC train | Brecha train-val |
-|---|---|---|---|---|---|---|---|---|---|
-| **CatBoost** | **0.8652 ± 0.0052** [0.8590, 0.8715] | **0.4032 ± 0.0113** [0.3896, 0.4169] | **0.5771 ± 0.0113** | **0.7305** | **0.0489** | **0.1776** | 0.0036 | 0.8735 | **+0.0082** |
-| XGBoost | 0.8646 ± 0.0049 [0.8586, 0.8705] | 0.4009 ± 0.0101 [0.3888, 0.4131] | 0.5747 ± 0.0095 | 0.7291 | 0.0491 | 0.1779 | 0.0034 | 0.8801 | +0.0156 |
-| LightGBM | 0.8631 ± 0.0049 [0.8572, 0.8690] | 0.3975 ± 0.0101 [0.3853, 0.4097] | 0.5731 ± 0.0103 | 0.7262 | 0.0492 | 0.1785 | 0.0034 | 0.9107 | +0.0476 |
-| Regresión Logística | 0.8400 ± 0.0066 [0.8320, 0.8479] | 0.3627 ± 0.0127 [0.3474, 0.3779] | 0.5345 ± 0.0116 | 0.6799 | 0.0511 | 0.1897 | 0.0106 | 0.8402 | +0.0003 |
+### Estadística e inferencia
+- Intervalos de confianza por **DeLong** (AUC) y **bootstrap percentil** (PR-AUC, KS, Brier).
+- **Test de DeLong** para AUC correlacionados y **t-test corregido de Nadeau-Bengio** para CV.
+- **Corrección de Holm** en las 10 comparaciones pareadas y **tamaños de efecto** (d de Cohen pareado).
+- Separación explícita entre **significancia estadística y práctica** (margen de 0.005 de AUC).
+- Diagnóstico de **calibración**: Brier, log loss, ECE, pendiente e intercepto, diagrama de fiabilidad.
 
-![Distribución de métricas por fold y brecha de sobreajuste](docs/images/results/01_cv_distribucion.png)
+### Machine learning
+- Regresión logística, **CatBoost, XGBoost y LightGBM** con los mismos folds.
+- **CV anidada** (5 folds externos x 3 internos) con **Optuna** (TPE, 12 trials por fold).
+- Clasificación desbalanceada (6.7 %) sin usar accuracy como métrica.
+- Prevención de fuga: imputación ajustada dentro de cada fold; holdout aislado.
 
-### 3.2 ¿Las diferencias son estadísticamente significativas?
+### Riesgo de crédito
+- Modelado de **PD**; KS, Gini, lift, deciles y concentración de riesgo.
+- **Scorecard tradicional**: binning, WoE, Information Value, puntos (PDO 20, 600 = odds 50:1) y conversión score a PD.
+- **Umbral por costos** para relaciones FN:FP de 1:1 a 20:1.
+- Marco **EL = PD x LGD x EAD** parametrizable (sin inventar LGD/EAD).
+- **Stress testing** por escenarios y marcos de **validación fuera de tiempo** e **inferencia de rechazados** documentados como limitación.
 
-Cada modelo contra el champion (CatBoost). Δ AUC = AUC(CatBoost) - AUC(modelo).
+### Validación de modelos y IA responsable
+- Estabilidad por semillas, folds, bootstrap y segmentos de población.
+- Diagnóstico de equidad por edad con IC de Wilson, sin conclusiones causales.
+- **Model Card**, **Data Card**, procedencia (commit, sha256 del dataset, versiones) y marco **champion-challenger**.
 
-| Modelo | Δ AUC (CV) | p Nadeau-Bengio (CV) | Δ AUC (holdout) | p DeLong (holdout) | Lectura |
-|---|---|---|---|---|---|
-| XGBoost | +0.0007 | 0.223 | +0.0009 | 0.138 | **Equivalentes**: no hay evidencia de diferencia |
-| LightGBM | +0.0021 | 0.004 | +0.0031 | < 0.001 | Diferencia real pero pequeña en la práctica |
-| Regresión Logística | +0.0253 | < 0.001 | +0.0243 | < 0.001 | Diferencia significativa y material |
+### Explicabilidad
+- SHAP **global**, **de dependencia**, **local** por solicitante e **interacciones**, distinguiendo asociación de causalidad.
 
-Los dos procedimientos, independientes entre sí (CV corregida y DeLong en
-holdout), llegan a la misma conclusión: los tres boosting forman un grupo
-casi empatado y la ventaja sobre el baseline lineal es robusta.
+### MLOps e ingeniería de software
+- MLflow (tracking + Model Registry), FastAPI, Streamlit, monitoreo de 5 familias de deriva.
+- 96 tests con pytest, Ruff, CI en GitHub Actions, pipeline reproducible con `make`.
 
-### 3.3 Holdout (20 %, 30,000 solicitantes, 2,005 defaults)
+## Aspectos técnicos destacados
 
-| Modelo | ROC-AUC [IC 95 % DeLong] | Gini | PR-AUC [IC 95 % bootstrap] | KS [IC 95 % bootstrap] | Brier | Log loss | ECE |
-|---|---|---|---|---|---|---|---|
-| **CatBoost** | **0.8704** [0.8624, 0.8785] | **0.7409** | **0.4066** [0.3817, 0.4283] | 0.5823 [0.5672, 0.6023] | **0.0487** | **0.1757** | 0.0027 |
-| XGBoost | 0.8696 [0.8614, 0.8777] | 0.7391 | 0.4047 [0.3802, 0.4281] | **0.5831** [0.5678, 0.6025] | **0.0487** | 0.1760 | **0.0025** |
-| LightGBM | 0.8674 [0.8592, 0.8756] | 0.7347 | 0.3976 [0.3739, 0.4207] | 0.5785 [0.5642, 0.5995] | 0.0491 | 0.1772 | 0.0028 |
-| Regresión Logística | 0.8462 [0.8367, 0.8557] | 0.6924 | 0.3621 [0.3412, 0.3857] | 0.5455 [0.5300, 0.5673] | 0.0514 | 0.1892 | 0.0120 |
-
-El AUC de holdout (0.870) cae dentro de la variabilidad observada entre
-folds (0.865 ± 0.005): la estimación de CV no fue optimista y el modelo
-generaliza a datos nunca vistos.
-
-### 3.4 Calibración
-
-| Modelo | Pendiente (ideal 1) | Intercepto (ideal 0) | Calibración global (observado - predicho) | ECE |
-|---|---|---|---|---|
-| CatBoost | 1.019 | 0.037 | -0.00001 | 0.0027 |
-| XGBoost | 1.008 | 0.015 | +0.00002 | 0.0025 |
-| LightGBM | 0.981 | -0.038 | -0.00017 | 0.0028 |
-| Regresión Logística | 1.001 | 0.003 | +0.00000 | 0.0120 |
-
-Los boosting entrenados con log loss salen **bien calibrados sin
-post-procesamiento** (pendiente ≈ 1, error medio < 0.3 puntos
-porcentuales), así que sus probabilidades pueden usarse directamente como
-PD. La LR tiene buena calibración global pero peor por tramos (ECE 4 veces
-mayor): su forma funcional no captura bien las no linealidades.
-
-![Diagrama de fiabilidad y distribución de probabilidades](docs/images/results/03_calibracion.png)
-
-### 3.5 Separación entre buenos y malos pagadores
-
-![Separación de clases y estadístico KS](docs/images/results/04_separacion_ks.png)
-
-KS = 0.582: en el punto de máxima separación (p ≈ 0.06) el 78 % de los
-buenos pagadores ya quedó por debajo del score, frente a solo el 20 % de los
-malos.
-
-### 3.6 Diagnóstico de sesgo y varianza
-
-- **Sin sobreajuste:** brecha train-validación de +0.008 en CatBoost y
-  +0.016 en XGBoost. LightGBM con `num_leaves` por defecto memoriza más
-  (+0.048): si se eligiera, habría que regularizarlo.
-- **Curva de aprendizaje:** el AUC de validación se estabiliza en ~0.865 a
-  partir de ~30k filas y la curva de train converge hacia ella. Más filas
-  con **las mismas 10 variables** aportarían poco; la mejora debe venir de
-  **información nueva** (variables de buró, comportamiento transaccional,
-  historial temporal), no de más datos ni de un modelo más complejo.
-
-![Curva de aprendizaje](docs/images/results/10_curva_aprendizaje.png)
-
-### 3.7 Explicabilidad (SHAP)
-
-![SHAP summary del champion](docs/images/results/09_shap.png)
-
-Las relaciones aprendidas son monótonas y coinciden con el conocimiento del
-dominio, requisito típico de validación en banca:
-
-- Mayor **utilización revolvente**, más riesgo (la variable más importante).
-- Cualquier **atraso** previo (30-59, 60-89, 90+ días) sube fuertemente el
-  riesgo, con efecto creciente según la severidad.
-- Mayor **edad**, menor riesgo; mayor **ingreso**, menor riesgo.
-
-La API devuelve además los factores SHAP **por solicitante**
-(`top_factors`), de modo que cada decisión es auditable.
-
-## 4. De métricas a decisiones de negocio
-
-### 4.1 Umbral de decisión: 0.5 no sirve con 6.7 % de prevalencia
-
-El umbral se elige con las predicciones *out-of-fold* del desarrollo
-(nunca en holdout) minimizando el costo esperado con un supuesto de
-**costo FN : FP = 5 : 1** (aprobar a quien incumple cuesta 5 veces más que
-rechazar a un buen cliente; es un parámetro, `--cost-fn/--cost-fp`).
-
-| Criterio (sobre OOF) | Umbral | Recall | Precisión | Tasa de rechazo |
-|---|---|---|---|---|
-| Máximo F1 | 0.205 | 0.500 | 0.400 | 8.4 % |
-| Youden (máx. sensibilidad + especificidad) | 0.070 | 0.764 | 0.223 | 22.9 % |
-| **Mínimo costo esperado (elegido)** | **0.155** | 0.572 | 0.354 | 10.8 % |
-| Teórico bayesiano `c_FP / (c_FP + c_FN)` | 0.167 | | | |
-
-Que el óptimo empírico (0.155) coincida con el teórico (0.167) es otra
-confirmación de que el modelo está bien calibrado.
-
-**Resultado en holdout (CatBoost):**
-
-| Umbral | Defaults detectados (recall) | Precisión | F1 | Tasa de rechazo | Costo esperado por solicitante |
-|---|---|---|---|---|---|
-| Sin modelo (aprobar a todos) | 0 % | | | 0 % | 0.334 |
-| 0.50 (por defecto) | 19.9 % | 0.583 | 0.296 | 2.3 % | 0.277 |
-| **0.155 (elegido)** | **58.2 %** | 0.363 | **0.447** | 10.7 % | **0.208** (-25 % vs 0.5; -38 % vs sin modelo) |
-
-![Métricas y costo esperado vs umbral](docs/images/results/05_umbral.png)
-![Matrices de confusión](docs/images/results/06_confusion.png)
-
-En producción el umbral es una variable de entorno (`DECISION_THRESHOLD`);
-`.env.example` ya trae el valor recomendado (0.16).
-
-### 4.2 Tabla de deciles (gains / lift), estándar en reportes de scoring
-
-| Decil de riesgo | Rango de PD | Tasa de default | Lift | % de defaults capturados (acum.) | KS |
-|---|---|---|---|---|---|
-| 1 (mayor riesgo) | 0.167-0.916 | 37.47 % | 5.61 | 56.1 % | 0.494 |
-| 2 | 0.081-0.167 | 11.70 % | 1.75 | 73.6 % | 0.574 |
-| 3 | 0.050-0.081 | 6.83 % | 1.02 | 83.8 % | 0.576 |
-| 4 | 0.032-0.050 | 3.87 % | 0.58 | 89.6 % | 0.531 |
-| 5 | 0.021-0.032 | 2.33 % | 0.35 | 93.1 % | 0.462 |
-| 6 | 0.015-0.021 | 1.77 % | 0.26 | 95.7 % | 0.383 |
-| 7 | 0.012-0.015 | 1.23 % | 0.18 | 97.6 % | 0.295 |
-| 8 | 0.009-0.012 | 0.77 % | 0.11 | 98.7 % | 0.200 |
-| 9 | 0.007-0.009 | 0.50 % | 0.07 | 99.5 % | 0.101 |
-| 10 (menor riesgo) | 0.004-0.007 | 0.37 % | 0.05 | 100.0 % | 0.000 |
-
-La tasa de default es **estrictamente monótona** por decil (requisito de un
-buen scorecard) y el decil 1 tiene 100 veces más riesgo que el decil 10.
-
-![Ganancia acumulada y tasa de default por decil](docs/images/results/07_ganancia_deciles.png)
-
-### 4.3 Curva de estrategia: cuánto riesgo se asume por cada nivel de aprobación
-
-| Tasa de aprobación | Default de la cartera aprobada (CatBoost) | Regresión Logística | Sin modelo |
+| Tema | Qué | Por qué | Cómo |
 |---|---|---|---|
-| 70 % | 1.55 % | 1.88 % | 6.68 % |
-| 80 % | **2.21 %** | 2.52 % | 6.68 % |
-| 85 % | 2.65 % | 2.88 % | 6.68 % |
-| 90 % | 3.26 % | 3.47 % | 6.68 % |
-| 95 % | 4.44 % | 4.60 % | 6.68 % |
+| **Holdout aislado** | El 20 % se mide una sola vez | Elegir modelo o umbral con él sesga la estimación | Champion por CV; umbral con predicciones out-of-fold ([`evaluation.py`](src/ml/evaluation.py)) |
+| **Sin fuga de datos** | Imputación dentro de cada fold | Medianas calculadas con todo el dataset filtran información del test | `Pipeline(SimpleImputer, modelo)` reajustado por fold |
+| **Inferencia correcta en CV** | Nadeau-Bengio | Los folds comparten filas y el t-test ingenuo es anti-conservador | Varianza `(1/J + n_val/n_fit) s²` ([`stats.py`](src/ml/stats.py)) |
+| **Comparaciones múltiples** | Holm sobre 10 pares | Con 10 tests, uno "significativo" puede ser azar | [`src/inference/`](src/inference/) |
+| **Significancia práctica** | Margen de 0.005 de AUC | Con 30,000 filas, 0.002 de AUC es "significativo" pero irrelevante | `interpret_difference` combina p ajustado y magnitud |
+| **CV anidada** | Tuning dentro de la CV interna | Estimar el desempeño del procedimiento completo, sin optimismo de selección | [`nested_cv.py`](src/ml/nested_cv.py), comparación pareada con valores por defecto |
+| **Scorecard WoE** | Benchmark tradicional de banca | Es lo que un regulador entiende y exige como referencia | Bins con WoE/IV, centinelas 96/98 en bins propios ([`scorecard.py`](src/risk/scorecard.py)) |
+| **Umbral por costos** | Mínimo costo esperado por relación FN:FP | Con 6.7 % de prevalencia, 0.5 solo detecta 20 % de los defaults | [`cost_analysis.py`](src/risk/cost_analysis.py) |
+| **Deriva sin autodespliegue** | Recomendación con `auto_deploy = False` fijo | Un cambio de población no justifica por sí solo un modelo nuevo | [`decision.py`](src/monitoring/decision.py), [`validate_model.py`](src/ml/validate_model.py) |
+| **No inventar** | LGD/EAD, fechas y rechazados no existen | Presentarlos como hechos sería falso | Los marcos fallan con un error explícito si faltan insumos |
 
-Esta es la vista que usa un comité de riesgo para fijar el *cut-off*: el
-área comercial elige la tasa de aprobación y el modelo dice qué riesgo trae.
+---
 
-![Curva de estrategia](docs/images/results/08_estrategia.png)
+## Benchmark de modelos
 
-## 5. Latencia y costo computacional
+**Holdout (20 %, 30,000 solicitantes, 2,005 defaults).**
 
-| Modelo | Latencia 1 fila p50 | p95 | Throughput por lotes | Tiempo de entrenamiento (96k filas) |
+| Modelo | ROC-AUC [IC 95 % DeLong] | PR-AUC | KS | Gini | Brier | Log loss | ECE |
+|---|---|---|---|---|---|---|---|
+| **CatBoost** | **0.8704** [0.8624, 0.8785] | **0.4066** | 0.5823 | **0.7409** | **0.0487** | **0.1757** | 0.0027 |
+| XGBoost | 0.8696 [0.8614, 0.8777] | 0.4047 | **0.5831** | 0.7391 | **0.0487** | 0.1760 | **0.0025** |
+| LightGBM | 0.8674 [0.8592, 0.8756] | 0.3976 | 0.5785 | 0.7347 | 0.0491 | 0.1772 | 0.0028 |
+| Scorecard WoE | 0.8594 [0.8508, 0.8680] | 0.3798 | 0.5660 | 0.7188 | 0.0504 | 0.1829 | 0.0060 |
+| Regresión Logística | 0.8462 [0.8367, 0.8557] | 0.3621 | 0.5455 | 0.6923 | 0.0514 | 0.1892 | 0.0120 |
+
+**Validación cruzada 5 x 3** (media ± d.e. [IC 95 % Nadeau-Bengio]).
+
+| Modelo | ROC-AUC | PR-AUC | KS | Brecha train-val |
 |---|---|---|---|---|
-| **CatBoost** | **0.41 ms** | **0.60 ms** | **~2.0 M filas/s** | 2.6 s |
-| LightGBM | 0.73 ms | 1.24 ms | ~0.17 M filas/s | 1.0 s |
-| XGBoost | 1.51 ms | 2.64 ms | ~0.41 M filas/s | 1.5 s |
-| Regresión Logística | 2.53 ms | 2.79 ms | ~0.36 M filas/s | 1.8 s |
+| CatBoost | 0.8652 ± 0.0052 [0.8590, 0.8715] | 0.4032 ± 0.0113 | 0.5771 ± 0.0113 | +0.008 |
+| XGBoost | 0.8646 ± 0.0049 [0.8586, 0.8705] | 0.4009 ± 0.0101 | 0.5747 ± 0.0095 | +0.016 |
+| LightGBM | 0.8631 ± 0.0049 [0.8572, 0.8690] | 0.3975 ± 0.0101 | 0.5731 ± 0.0103 | +0.048 |
+| Scorecard WoE | 0.8562 ± 0.0052 | | | |
+| Regresión Logística | 0.8400 ± 0.0066 [0.8320, 0.8479] | 0.3627 ± 0.0127 | 0.5345 ± 0.0116 | +0.000 |
 
-Medido en CPU (Linux, Python 3.11) con `predict_proba` sobre un
-`DataFrame` de una fila, que es lo que paga la API por solicitud. Las
-cifras absolutas dependen del hardware; el orden relativo es lo relevante.
-En la LR el costo lo domina el `QuantileTransformer`, no el modelo. La API
-añade el cálculo SHAP por solicitante.
+El AUC de holdout (0.870) cae dentro de la variabilidad entre folds: la estimación de CV no fue optimista.
 
-## 6. Decisión de modelo
+![Curvas ROC y Precision-Recall](reports/figures/02_roc_pr.png)
+![Diagrama de fiabilidad](reports/figures/03_calibracion.png)
 
-| Criterio | CatBoost | XGBoost |
+## Comparación estadística de modelos
+
+Holdout, test de DeLong con ajuste de Holm (10 comparaciones). Δ = AUC(A) - AUC(B).
+
+| A | B | Δ AUC | IC 95 % | p | p Holm | Lectura |
+|---|---|---|---|---|---|---|
+| CatBoost | XGBoost | +0.0009 | [-0.0003, 0.0021] | 0.138 | 0.138 | Sin evidencia de diferencia |
+| CatBoost | LightGBM | +0.0031 | [0.0013, 0.0048] | 0.0005 | 0.0015 | Significativa pero prácticamente irrelevante |
+| XGBoost | LightGBM | +0.0022 | [0.0008, 0.0036] | 0.0017 | 0.0034 | Significativa pero prácticamente irrelevante |
+| CatBoost | Scorecard WoE | +0.0110 | [0.0085, 0.0136] | < 0.001 | < 0.001 | Significativa y material |
+| XGBoost | Scorecard WoE | +0.0102 | [0.0075, 0.0128] | < 0.001 | < 0.001 | Significativa y material |
+| LightGBM | Scorecard WoE | +0.0080 | [0.0050, 0.0109] | < 0.001 | < 0.001 | Significativa y material |
+| Scorecard WoE | Regresión Logística | +0.0132 | [0.0080, 0.0185] | < 0.001 | < 0.001 | Significativa y material |
+| CatBoost | Regresión Logística | +0.0243 | [0.0192, 0.0293] | < 0.001 | < 0.001 | Significativa y material |
+
+La comparación equivalente en CV (Nadeau-Bengio + Holm) llega a las mismas conclusiones: los tres boosting forman un grupo prácticamente empatado, todos superan al scorecard y el scorecard supera a la regresión logística sobre variables transformadas.
+
+![Comparación pareada en holdout](reports/figures/17_model_comparison_holdout.png)
+
+## Scorecard tradicional vs machine learning
+
+Scorecard ajustado solo con desarrollo: bins por cuantiles (o por valor en conteos), mínimo 1 % de observaciones por bin, faltantes y centinelas 96/98 en bins propios, regresión logística sobre WoE y escalado a puntos (PDO 20, 600 puntos = odds 50:1).
+
+| Variable | IV | Poder predictivo |
 |---|---|---|
-| ROC-AUC CV / holdout | 0.8652 / 0.8704 | 0.8646 / 0.8696 (diferencia no significativa) |
-| Brecha de sobreajuste | +0.008 | +0.016 |
-| Calibración (ECE) | 0.0027 | 0.0025 |
-| Latencia p50 | 0.41 ms | 1.51 ms |
+| `revolving_utilization_unsecured` | 1.107 | muy alto |
+| `number_of_times_90_days_late` | 0.883 | muy alto |
+| `number_of_time_30_59_days_past_due` | 0.746 | muy alto |
+| `number_of_time_60_89_days_past_due` | 0.602 | muy alto |
+| `age` | 0.248 | medio |
+| `monthly_income`, `debt_ratio`, `number_open_credit_lines`, `number_real_estate_loans`, `number_dependents` | 0.037-0.074 | débil |
 
-- **Champion estadístico: CatBoost** (mejor AUC medio, menor brecha y
-  latencia 3.7 veces menor).
-- `src/ml/train.py` entrena **XGBoost por defecto** (es lo que usa la demo
-  desplegada). Como la diferencia con CatBoost no es significativa
-  (p = 0.22 en CV, p = 0.14 DeLong), mantenerlo es defendible; migrar a
-  CatBoost es un cambio de un parámetro
-  (`train_model(data, algorithm="catboost")`) y se recomienda por latencia
-  y estabilidad.
-- **Baseline interpretable:** la Regresión Logística (AUC 0.846 en holdout)
-  queda a 2.4 puntos de AUC y es la alternativa si un regulador exige un
-  modelo lineal tipo scorecard.
+- La regla habitual marca IV > 0.5 para **revisar posible fuga**. Aquí son utilización y atrasos, las variables de comportamiento más conocidas del crédito, pero el dataset no documenta en qué fecha se midieron. No hay evidencia de fuga, aunque tampoco se puede descartar.
+- La tasa de default cae con cada decil de riesgo del scorecard salvo en el último par (0.53 % vs 0.63 %, con solo 16 y 19 defaults): la monotonía **no es estricta**.
+- **Lectura para negocio:** el scorecard pierde 1.1 puntos de AUC frente al champion a cambio de una tabla de puntos auditable. La decisión depende de si el regulador exige un modelo lineal.
 
-## 7. Limitaciones y riesgo de modelo
-
-Lo que un validador de modelos debería saber antes de confiar en estos
-números:
-
-1. **Sin validación fuera de tiempo (out-of-time).** El dataset no trae
-   fechas, así que el split es aleatorio. En producción el desempeño suele
-   ser menor por cambios en la población y el ciclo económico; por eso
-   existe el monitoreo de PSI y de AUC en vivo (sección 9).
-2. **Sesgo de selección / reject inference.** Solo se observa el
-   comportamiento de solicitantes que fueron aprobados en el pasado; el
-   modelo no ha visto a la población rechazada.
-3. **Supuesto de costos.** La relación FN:FP = 5:1 es ilustrativa; debe
-   reemplazarse por la pérdida esperada real (LGD x exposición) y el margen
-   perdido por cliente rechazado.
-4. **Variables sensibles.** `age` es una variable protegida en muchas
-   regulaciones de crédito justo; su uso debe revisarse con cumplimiento y
-   medirse la equidad por grupo si se dispone de los atributos.
-5. **Sin ajuste de hiperparámetros.** Deliberado para comparar familias en
-   igualdad de condiciones; dado el plateau de la curva de aprendizaje, la
-   ganancia esperada del tuning es pequeña.
-6. **Datos:** 609 filas duplicadas conservadas y códigos centinela 96/98
-   sin variable indicadora explícita.
-7. **Selección en el pipeline automático.** `src/ml/benchmark.py` (el que
-   corre en cada reentrenamiento) elige por AUC en un único split de test;
-   `src/ml/evaluation.py` es la vía rigurosa (CV + tests). Unificarlos es
-   el siguiente paso del roadmap.
-
-**Roadmap:** validación out-of-time con Lending Club 2007-2018 (datos con
-fecha), variables con WoE y scorecard de puntos, tuning con Optuna bajo CV
-anidada, análisis de equidad, umbral y costos parametrizados desde MLflow.
-
-## 8. Mejoras incorporadas en esta versión
-
-| Mejora | Por qué importa |
+| | |
 |---|---|
-| Módulo de evaluación `src/ml/evaluation.py` (CV 5x3, IC, DeLong, Nadeau-Bengio, bootstrap, calibración, deciles, umbral, latencia, 10 figuras) | Las métricas pasan de "un número en un split" a estimaciones con incertidumbre y tests formales |
-| Toolkit estadístico `src/ml/stats.py` con tests unitarios (`tests/test_stats.py`) | DeLong verificado contra `sklearn`, tests más conservadores que el t ingenuo, calibración en datos sintéticos |
-| **Corrección de fuga de datos:** imputación ajustada solo con el split de train | Antes las medianas se calculaban con todo el dataset, incluido el test |
-| **Corrección de train/serve skew:** las medianas de train se guardan en `imputation_values.json` y la inferencia las usa | Antes un ingreso faltante se imputaba con 0 en inferencia y con la mediana en entrenamiento |
-| Baseline de Regresión Logística con transformación por cuantiles | ROC-AUC del baseline: 0.694 con `StandardScaler` a **0.840** en CV; ahora es un baseline justo |
-| Umbral de decisión por costo esperado, elegido sin tocar el holdout | Con 0.5 el modelo solo detectaba el 20 % de los defaults |
-| `make evaluate` / `make evaluate-quick` | Todo el reporte es reproducible con un comando |
+| ![Information Value](reports/figures/12_scorecard_information_value.png) | ![Distribución de puntaje](reports/figures/13_scorecard_score_distribution.png) |
 
-## 9. Arquitectura MLOps
+## CV anidada con Optuna
 
-El diseño sigue dos referencias:
+5 folds externos x 3 internos, 12 trials TPE por fold, objetivo ROC-AUC. Cada fold externo compara el modelo ajustado contra los parámetros por defecto **en los mismos datos**.
 
-1. **[MLOps: continuous delivery and automation pipelines in machine learning](https://cloud.google.com/architecture/mlops-continuous-delivery-and-automation-pipelines-in-machine-learning)**
-   (Google Cloud): los tres niveles de madurez de MLOps usados como mapa de ruta.
-2. **[Kreuzberger, Kühl y Hirschl (2023), "Machine Learning Operations
-   (MLOps): Overview, Definition, and Architecture", arXiv:2205.02302](https://arxiv.org/abs/2205.02302)**:
-   los 9 principios de MLOps (P1-P9), mapeados a los módulos del repo.
+| Modelo | AUC externo ajustado | AUC externo por defecto | Δ | p (Nadeau-Bengio) | Holdout ajustado vs defecto (p DeLong) |
+|---|---|---|---|---|---|
+| CatBoost | 0.8656 ± 0.0066 | 0.8653 | +0.0003 | 0.263 | 0.8703 vs 0.8704 (0.823) |
+| LightGBM | 0.8648 ± 0.0066 | 0.8629 | +0.0019 | **0.035** | 0.8699 vs 0.8674 (< 0.001) |
+| XGBoost | 0.8644 ± 0.0064 | 0.8642 | +0.0002 | 0.684 | 0.8698 vs 0.8696 (0.689) |
+| Regresión Logística | 0.8401 ± 0.0084 | 0.8400 | +0.0001 | 0.834 | 0.8465 vs 0.8462 (0.678) |
 
-Solo una fracción de un sistema de ML de producción es "código de ML": la
-configuración, la validación de datos y el monitoreo pesan igual o más.
+**Conclusión:** con estas 10 variables, el techo lo pone la información disponible, no los hiperparámetros. El tuning solo ayuda a LightGBM, cuyo valor por defecto sobreajusta (brecha train-val de +0.048). El optimismo de la CV interna frente a la externa es ≤ 0.0003 en todos los modelos.
 
-![Componentes de un sistema de ML](docs/images/01-componentes-sistema-ml.png)
+![CV anidada](reports/figures/26_nested_cv.png)
 
-<details>
-<summary><b>Los tres niveles de madurez MLOps (Google Cloud)</b></summary>
+## Umbral de decisión por costos
 
-**Nivel 0: proceso manual.** Scripts ejecutados a mano; el paso a
-producción es una entrega manual del modelo.
+El umbral de cada escenario se elige con predicciones out-of-fold del desarrollo y se mide en holdout (CatBoost). Los costos son unidades relativas ilustrativas.
 
-![MLOps Nivel 0](docs/images/02-mlops-nivel-0-manual.png)
+| FN:FP | Umbral | Precisión | Recall | F1 | Aprobación | Rechazo | Default en aprobados | Costo esperado | Costo sin modelo |
+|---|---|---|---|---|---|---|---|---|---|
+| 1:1 | 0.495 | 0.576 | 0.202 | 0.300 | 97.7 % | 2.3 % | 5.46 % | 0.063 | 0.067 |
+| 2:1 | 0.345 | 0.504 | 0.344 | 0.409 | 95.4 % | 4.6 % | 4.60 % | 0.110 | 0.134 |
+| 3:1 | 0.240 | 0.431 | 0.468 | 0.449 | 92.7 % | 7.3 % | 3.83 % | 0.148 | 0.201 |
+| **5:1** | **0.155** | 0.363 | 0.582 | 0.447 | 89.3 % | 10.7 % | 3.13 % | 0.208 | 0.334 |
+| 10:1 | 0.080 | 0.244 | 0.739 | 0.367 | 79.8 % | 20.2 % | 2.19 % | 0.327 | 0.668 |
+| 20:1 | 0.045 | 0.177 | 0.853 | 0.294 | 67.8 % | 32.2 % | 1.44 % | 0.461 | 1.337 |
 
-**Nivel 1: pipeline de entrenamiento automatizado.** Validación de datos,
-preparación, entrenamiento y validación del modelo se ejecutan de forma
-automática y repetible, con *feature store* y almacén de metadatos.
+Los umbrales empíricos siguen de cerca al teórico `1/(1+ratio)`, otra evidencia de buena calibración. La API usa 0.16 (`DECISION_THRESHOLD`).
 
-![MLOps Nivel 1](docs/images/03-mlops-nivel-1-pipeline-automatizado.png)
+![Umbral por costos](reports/figures/15_cost_ratio_thresholds.png)
 
-**Nivel 2: CI/CD del pipeline.** El propio pipeline se construye, prueba y
-despliega con CI/CD, y el monitoreo de producción dispara nuevas iteraciones.
+## Cartera: deciles, lift y concentración
 
-![MLOps Nivel 2, fases](docs/images/04-mlops-nivel-2-cicd-fases.png)
-![MLOps Nivel 2, flujo](docs/images/05-mlops-nivel-2-flujo-cicd.png)
+| Segmento más riesgoso | Defaults capturados | Tasa de default | Lift |
+|---|---|---|---|
+| 5 % | 36.9 % | 49.3 % | 7.4x |
+| 10 % | 56.1 % | 37.5 % | 5.6x |
+| 20 % | 73.6 % | 24.6 % | 3.7x |
+| 30 % | 83.8 % | 18.7 % | 2.8x |
 
-</details>
+Escenarios analíticos de aprobación (no son recomendaciones de crédito): aprobando el 70 / 80 / 90 / 95 % de menor riesgo, la tasa de default de la cartera aprobada es 1.55 / 2.21 / 3.26 / 4.44 %, frente a 6.68 % sin modelo.
 
-**Dónde está este repo hoy:** el entrenamiento corre un benchmark de 4
-algoritmos, registra el ganador en MLflow y lo pasa por un gate de
-promoción champion/challenger, lo que cubre el **Nivel 1**. La orquestación
-se está migrando a **Databricks** (jobs, tablas Delta, MLflow en Unity
-Catalog) en reemplazo de la versión anterior con Prefect, PostgreSQL y Docker.
+![Lift y defaults acumulados](reports/figures/14_lift_and_cumulative_defaults.png)
+![Tasa de default por decil](reports/figures/07_ganancia_deciles.png)
 
-### Principios de MLOps aplicados
+## Estabilidad
 
-| # | Principio | Dónde vive en este repo |
+| Fuente de variación | CatBoost ROC-AUC |
+|---|---|
+| 15 folds (CV 5x3) | 0.8652 ± 0.0052 |
+| 10 semillas (split + modelo) | media 0.8655 · d.e. 0.0032 · mediana 0.8658 · IQR 0.0015 · IC 95 % [0.8632, 0.8678] |
+| Bootstrap del holdout | PR-AUC [0.382, 0.428] · KS [0.567, 0.602] |
+
+Por segmento de población, el AUC del champion va de 0.846 (30-39 años) a 0.871 (70+ años), con IC bootstrap que se solapan. Por nivel de utilización, el AUC dentro de cada tramo baja a 0.75-0.82: la utilización explica buena parte del ordenamiento global.
+
+![Estabilidad por semilla](reports/figures/18_seed_stability.png)
+
+## Equidad (diagnóstico descriptivo por edad)
+
+La edad es la única variable potencialmente sensible del dataset. No hay género, estado civil, etnia ni geografía, así que la equidad **solo** puede evaluarse por edad.
+
+| Edad | n | Tasa de rechazo [IC 95 %] | TPR | FPR | Default observado | PD media |
+|---|---|---|---|---|---|---|
+| 18-29 | 1,803 | 20.3 % [18.5, 22.2] | 64.3 % | 14.0 % | 12.6 % | 11.6 % |
+| 30-39 | 4,658 | 18.1 % [17.0, 19.2] | 65.3 % | 12.6 % | 10.3 % | 10.3 % |
+| 40-49 | 6,930 | 14.1 % [13.3, 15.0] | 60.4 % | 9.8 % | 8.5 % | 8.5 % |
+| 50-59 | 6,958 | 9.4 % [8.7, 10.1] | 52.7 % | 6.6 % | 6.1 % | 6.1 % |
+| 60-69 | 5,813 | 4.8 % [4.2, 5.3] | 47.7 % | 3.3 % | 3.4 % | 3.7 % |
+| 70+ | 3,838 | 2.4 % [2.0, 3.0] | 37.2 % | 1.7 % | 2.2 % | 2.3 % |
+
+- El modelo está **calibrado dentro de cada grupo** (default observado ≈ PD media), así que la mayor tasa de rechazo de los jóvenes acompaña a su mayor tasa de default observada.
+- Aun así, un buen pagador de 18-29 años tiene **8.4 veces** más probabilidad de ser rechazado (FPR 14.0 %) que uno de 70+ (1.7 %). Es una disparidad real de error que un comité debe evaluar. Si la regulación prohíbe usar la edad, habría que reentrenar sin ella y medir el costo en AUC.
+- Estas diferencias son descriptivas y no se interpretan como causales.
+
+![Equidad por edad](reports/figures/20_fairness_by_age.png)
+
+## Explicabilidad
+
+| Variable | Media de \|SHAP\| | Asociación (Spearman valor-SHAP) |
 |---|---|---|
-| P1 | CI/CD | `.github/workflows/ci-cd.yml` (ruff + pytest) |
-| P2 | Orquestación (DAG) | Jobs de Databricks (en migración) |
-| P3 | Reproducibilidad | Esquema fijo (`config/data_schema.yaml`), semillas fijas, mismos folds para todos los candidatos, `make evaluate` |
-| P4 | Versionado | Git + MLflow Model Registry (`bcp_credit_champion`) |
-| P5 | Colaboración | Feature store (`src/feature_store/features.py`) compartido por entrenamiento, API y demo |
-| P6 | Entrenamiento y evaluación continuos | `benchmark.py` + `train.py` + `evaluation.py` + `validate_model.py` (gate de promoción) |
-| P7 | Metadatos de ML | `mlflow.log_params` / `log_metrics` (train y test) por corrida |
-| P8 | Monitoreo continuo | `validate.py` (calidad) + `monitoring/drift.py` (PSI por feature) + `api/monitoring.py` (tasa y AUC en vivo) |
-| P9 | Retroalimentación | `monitoring/decision.py` (`decide_retrain`) ante drift de tasa, PSI o caída de AUC |
+| `revolving_utilization_unsecured` | 0.582 | +0.95 |
+| `number_of_time_30_59_days_past_due` | 0.309 | +0.64 |
+| `age` | 0.249 | -0.98 |
+| `number_of_times_90_days_late` | 0.190 | +0.40 |
+| `number_open_credit_lines` | 0.155 | +0.85 |
 
-### Monitoreo y reentrenamiento automático
+Las relaciones más fuertes coinciden con la intuición de crédito (más utilización y atrasos, más riesgo; más edad, menos riesgo). La interacción más fuerte es utilización x atraso de 30-59 días. **SHAP describe asociaciones que el modelo aprendió, no efectos causales.** La API devuelve los factores SHAP de cada solicitante (`top_factors`).
 
-Tres señales independientes; cualquiera dispara el reentrenamiento
-(`decide_retrain`):
+| | |
+|---|---|
+| ![Dependencia SHAP](reports/figures/23_shap_dependence.png) | ![Explicaciones locales](reports/figures/24_shap_local.png) |
 
-1. **Drift de tasa de rechazo** (`drift_trigger`): señal barata e inmediata.
-2. **Drift de datos (PSI por feature)** contra la distribución de
-   entrenamiento guardada en `reference_distribution.json`: < 0.1 estable,
-   0.1-0.2 moderado, > 0.2 significativo (`DRIFT_PSI_THRESHOLD`).
-3. **Caída de performance en vivo:** con resultados reales reportados vía
-   `POST /api/v1/outcomes`, si el AUC en producción cae más de
-   `PERFORMANCE_AUC_DROP_THRESHOLD` respecto al del champion.
+## Stress testing (análisis de escenarios, no pronóstico)
 
-El reentrenamiento corre el benchmark de los 4 algoritmos, registra el
-ganador en MLflow y lo promueve solo si supera al champion vigente.
-Predicciones y resultados se registran en JSONL (`predictions.jsonl`,
-`outcomes.jsonl`); en Databricks pasan a tablas Delta.
+Choques ilustrativos definidos en [`config/stress_scenarios.yaml`](config/stress_scenarios.yaml), aplicados a las variables del holdout con el mismo modelo y umbral.
 
-### Estructura del proyecto
+| Escenario | Choques | PD media | Cambio vs base | Tasa de rechazo |
+|---|---|---|---|---|
+| Base | ninguno | 6.68 % | | 10.7 % |
+| Moderado | ingreso -10 %, utilización +15 %, endeudamiento +11 %, 5 % con un atraso adicional | 8.52 % | +27 % | 15.9 % |
+| Severo | ingreso -25 %, utilización +30 %, endeudamiento +33 %, 15 % con un atraso de 30-59 días y 5 % con uno de 60-89 días | 10.36 % | +55 % | 20.5 % |
+
+No se calcula pérdida esperada: el dataset no tiene LGD ni EAD, y [`expected_loss.py`](src/risk/expected_loss.py) se niega a calcularla sin insumos explícitos.
+
+![Stress testing](reports/figures/19_stress_scenarios.png)
+
+## Monitoreo y reentrenamiento
+
+Cinco familias de señales, demostradas offline: referencia = predicciones out-of-fold del desarrollo; ventana A = holdout; ventana B = **stress moderado simulado** (sin outcomes inventados).
+
+| Señal | Holdout | Cambio SIMULADO |
+|---|---|---|
+| Calidad de datos (faltantes, esquema, rangos) | sin alertas | n/a |
+| Máximo PSI por variable | 0.0005 | 0.029 |
+| PSI de la PD (predicción) | 0.001 | 0.025 |
+| Desempeño (AUC, KS, Brier, calibración) | sin degradación | n/a (sin outcomes) |
+| Tasa de rechazo (negocio) | 10.8 % → 10.7 % | 10.8 % → **15.9 %** |
+| Recomendación | continuar monitoreo | **abrir candidato de reentrenamiento** (`auto_deploy = False`) |
+
+**Hallazgo:** con umbrales convencionales de PSI (0.2), un choque moderado de ingreso y utilización pasa inadvertido en el PSI por variable, pero la deriva de negocio lo detecta. Por eso se monitorean varias familias y no solo el PSI.
+
+![PSI](reports/figures/21_psi_monitoring.png)
+
+## Gobernanza
+
+- **[Model Card](reports/MODEL_CARD.md)** y **[Data Card](reports/DATA_CARD.md)** generadas con los resultados, más procedencia: commit, sha256 del dataset, configuración y versiones de librerías.
+- **Champion vs challenger** ([`champion_challenger.py`](src/governance/champion_challenger.py)): el modelo servido hoy es XGBoost; CatBoost tiene +0.0009 de AUC (p DeLong = 0.138), así que la recomendación es **mantener el champion**. Un challenger solo es elegible si su mejora es significativa, supera el margen práctico y no empeora la calibración, y aun así requiere aprobación humana.
+- **Política de reentrenamiento:** [`docs/governance/RETRAINING_POLICY.md`](docs/governance/RETRAINING_POLICY.md).
+
+## Limitaciones
+
+Lo que este proyecto **no** hace, y por qué:
+
+1. **Out-of-time validation cannot be performed with the current dataset.** No hay ninguna variable temporal. El split es aleatorio y el desempeño en producción suele ser menor. [`oot.py`](src/risk/oot.py) deja lista la partición cronológica para cuando haya fechas.
+2. **Sin inferencia de rechazados.** Solo hay solicitantes con desempeño observado. Parceling, fuzzy augmentation y reponderación están implementados y probados **solo con datos sintéticos**; el muestreo de rechazados queda como trabajo futuro.
+3. **Sin LGD/EAD.** La pérdida esperada es un marco parametrizable, no un resultado.
+4. **Equidad limitada a la edad** y sin conclusiones causales.
+5. **Costos FN:FP ilustrativos**: deben reemplazarse por pérdidas reales.
+6. **No es un sistema bancario en producción**: es un proyecto orientado a producción, con API desplegada en un plan gratuito, sin tráfico real ni orquestador programado para el monitoreo.
+7. **Datos:** 609 filas duplicadas conservadas y códigos centinela 96/98 (269 filas, 54.6 % de default) tratados como bins propios en el scorecard.
+
+## Reproducibilidad
+
+| Paso | Comando | Salida |
+|---|---|---|
+| Instalar | `make setup` | dependencias de `requirements.txt` |
+| Calidad | `make lint` · `make test` | Ruff · 96 tests |
+| Evaluación base | `make evaluate` | `reports/metrics.json`, figuras 01-10 |
+| CV anidada | `make nested-cv` | `reports/nested_cv.json` (reanudable) |
+| Reporte completo | `make report` | `reports/results.json`, figuras 01-26, Model Card, Data Card |
+| Entrenar modelo servido | `make train` | artefacto + MLflow (best-effort) |
+| Servir | `make api` · `make demo` | FastAPI · Streamlit |
+
+Semilla 42 en split, folds, bootstrap, Optuna y modelos. Los datos crudos vienen en `DATA/GiveMeSomeCredit/`.
+
+## Estructura del proyecto
 
 ```text
 credit-risk-ml-platform/
-├── .github/workflows/ci-cd.yml   # CI: ruff + pytest
-├── config/data_schema.yaml       # Esquema canónico: columnas, límites, etiquetas
-├── DATA/GiveMeSomeCredit/        # Dataset crudo (Kaggle)
-├── docs/
-│   ├── images/                   # Diagramas de arquitectura
-│   ├── images/results/           # Figuras de evaluación (generadas por make evaluate)
-│   └── results/                  # metrics.json + evaluation_report.md (generados)
-├── pages/1_📊_Monitoreo.py       # Panel de monitoreo en Streamlit
+├── config/                    # Esquema de datos y escenarios de stress
+├── DATA/GiveMeSomeCredit/     # Dataset crudo (Kaggle)
+├── docs/governance/           # Política de monitoreo y reentrenamiento
+├── reports/                   # Resultados generados: JSON, figuras, Model/Data Card
 ├── src/
-│   ├── data_pipeline/            # Ingesta, validación, split e imputación sin fuga
-│   ├── feature_store/            # Transformaciones compartidas (train == serving)
-│   ├── ml/
-│   │   ├── train.py              # Entrena un algoritmo y guarda modelo + medianas + referencia PSI
-│   │   ├── benchmark.py          # Compara los 4 candidatos (pipeline automático)
-│   │   ├── evaluation.py         # Evaluación rigurosa: CV, IC, tests, umbral, figuras
-│   │   ├── stats.py              # DeLong, bootstrap, Nadeau-Bengio, ECE, deciles, umbral
-│   │   ├── plots.py              # Figuras del reporte
-│   │   ├── metrics.py            # ROC-AUC, PR-AUC, Gini, KS, calibración, diagnóstico de ajuste
-│   │   ├── report.py             # Informe de entrenamiento (Markdown + PDF)
-│   │   ├── predict.py            # Inferencia
-│   │   ├── validate_model.py     # Gate champion/challenger
-│   │   └── explainability.py     # SHAP
-│   ├── monitoring/               # PSI y regla de reentrenamiento
-│   └── api/                      # FastAPI: predicción, outcomes, estado de monitoreo
-├── tests/                        # pytest
-├── app.py                        # Demo (Streamlit)
-├── Makefile
-└── requirements.txt
+│   ├── data_pipeline/         # Ingesta, validación, split e imputación sin fuga
+│   ├── feature_store/         # Transformación única para entrenamiento y serving
+│   ├── ml/                    # Entrenamiento, evaluación, CV anidada, estabilidad, SHAP, gate
+│   ├── inference/             # Holm, tamaños de efecto, comparación pareada
+│   ├── risk/                  # Scorecard, costos, cartera, equidad, stress, EL, OOT, rechazados
+│   ├── monitoring/            # Calidad, PSI, predicción, desempeño, negocio, decisión
+│   ├── governance/            # Procedencia, Model/Data Card, champion-challenger
+│   ├── pipelines/             # Reporte completo (make report)
+│   └── api/                   # FastAPI
+├── pages/, app.py             # Dashboard Streamlit
+├── tests/                     # 96 tests
+└── Makefile
 ```
 
-## 10. Uso: inicio rápido, API y demo
+## Habilidades demostradas y evidencia
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1          # Linux/macOS: source .venv/bin/activate
-pip install -r requirements.txt
+| Habilidad | Evidencia en el repositorio |
+|---|---|
+| Inferencia estadística | [`src/ml/stats.py`](src/ml/stats.py), [`src/inference/`](src/inference/), [`tests/test_stats.py`](tests/test_stats.py), [`tests/test_inference.py`](tests/test_inference.py) |
+| Validación de modelos | [`src/ml/evaluation.py`](src/ml/evaluation.py), [`src/ml/nested_cv.py`](src/ml/nested_cv.py), [`src/ml/stability.py`](src/ml/stability.py) |
+| Riesgo de crédito | [`src/risk/`](src/risk/), [`tests/test_scorecard.py`](tests/test_scorecard.py), [`tests/test_risk_modules.py`](tests/test_risk_modules.py) |
+| Machine learning | [`src/ml/train.py`](src/ml/train.py), [`reports/nested_cv.json`](reports/nested_cv.json) |
+| IA explicable | [`src/ml/explainability.py`](src/ml/explainability.py), figuras 09 y 23-25 |
+| IA responsable | [`src/risk/fairness.py`](src/risk/fairness.py), [`reports/MODEL_CARD.md`](reports/MODEL_CARD.md) |
+| Gobernanza de modelos | [`src/governance/`](src/governance/), [`docs/governance/`](docs/governance/), [`tests/test_governance.py`](tests/test_governance.py) |
+| MLOps y monitoreo | [`src/monitoring/`](src/monitoring/), MLflow en [`src/ml/train.py`](src/ml/train.py), [`tests/test_monitoring_extended.py`](tests/test_monitoring_extended.py) |
+| Desarrollo de APIs | [`src/api/`](src/api/), [`tests/test_api.py`](tests/test_api.py) |
+| Ingeniería de datos | [`src/data_pipeline/`](src/data_pipeline/), [`config/data_schema.yaml`](config/data_schema.yaml) |
+| Testing y CI/CD | [`tests/`](tests/), [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml) |
 
-python -m src.ml.evaluation           # 1. Evaluación completa y figuras del README (make evaluate)
-python -m src.ml.benchmark            # 2. Benchmark rápido de los 4 algoritmos (no registra nada)
-python -m src.ml.train                # 3. Entrena y registra el modelo, guarda informe MD + PDF
-uvicorn src.api.main:app --reload     # 4a. API
-streamlit run app.py                  # 4b. Demo (incluye el panel "Monitoreo")
-```
-
-Atajos: `make install | evaluate | evaluate-quick | benchmark | train | run | demo | test | lint`.
-
-> La API necesita un modelo en `MODEL_PATH` (por defecto
-> `data/processed/model.joblib`); si no existe, `/api/v1/predict` responde
-> `503` explicando cómo entrenarlo. La demo de Streamlit entrena el modelo
-> sola la primera vez, por lo que funciona tal cual en Streamlit Community Cloud.
-
-### API
+## API y demo
 
 | Endpoint | Método | Descripción |
 |---|---|---|
 | `/api/v1/health` | GET | Liveness check |
-| `/api/v1/features` | GET | Campos que necesita `/predict` (nombre, etiqueta, descripción, límites) |
-| `/api/v1/predict` | POST | Probabilidad de default, decisión, banda de riesgo y factores SHAP |
-| `/api/v1/outcomes` | POST | Resultado real de un solicitante ya evaluado (performance en vivo) |
-| `/api/v1/monitoring/status` | GET | Drift de tasa y PSI por feature, AUC en vivo y recomendación de reentrenar |
+| `/api/v1/features` | GET | Campos que necesita `/predict` |
+| `/api/v1/predict` | POST | PD, decisión, banda de riesgo y factores SHAP |
+| `/api/v1/outcomes` | POST | Resultado real de un solicitante evaluado (desempeño en vivo) |
+| `/api/v1/monitoring/status` | GET | Deriva, AUC en vivo y recomendación |
 
-Solicitud a `/api/v1/predict`:
+Para probarla: abre [`/docs`](https://credit-risk-api-mdix.onrender.com/docs), ejecuta `GET /api/v1/features` y luego `POST /api/v1/predict` con "Try it out".
 
-```json
-{
-  "applicant_id": "demo-1",
-  "revolving_utilization_unsecured": 0.9,
-  "age": 29,
-  "number_of_time_30_59_days_past_due": 3,
-  "debt_ratio": 1.2,
-  "monthly_income": 1800,
-  "number_open_credit_lines": 2,
-  "number_of_times_90_days_late": 2,
-  "number_real_estate_loans": 0,
-  "number_of_time_60_89_days_past_due": 1,
-  "number_dependents": 3
-}
-```
+## Resumen para portafolio
 
-Respuesta:
+Plataforma de riesgo de crédito orientada a producción que estima la probabilidad de default con CatBoost, XGBoost, LightGBM, regresión logística y un scorecard WoE tradicional. Los compara con inferencia estadística rigurosa (DeLong, Nadeau-Bengio, Holm, CV anidada con Optuna) y traduce el modelo en decisiones con umbrales por costos, análisis de cartera y stress testing. Incluye explicabilidad SHAP, diagnóstico de equidad, monitoreo de deriva sin despliegue automático, Model Card y Data Card, una API FastAPI desplegada y 96 tests con CI. Documenta explícitamente lo que el dataset no permite hacer: validación fuera de tiempo, inferencia de rechazados y LGD/EAD.
 
-```json
-{
-  "applicant_id": "demo-1",
-  "probability": 0.72,
-  "decision": "rechazar",
-  "risk_band": "alto",
-  "top_factors": [
-    {"feature": "number_of_times_90_days_late", "value": 2.0, "impact": 1.45},
-    {"feature": "number_of_time_30_59_days_past_due", "value": 3.0, "impact": 0.73}
-  ],
-  "model_version": "local"
-}
-```
+## Referencias
 
-Reportar el resultado real meses después: `POST /api/v1/outcomes` con
-`{"applicant_id": "demo-1", "actual_default": true}`.
-
-### Demo (Streamlit)
-
-Formulario con los mismos campos que la API (descripciones tomadas de
-`config/data_schema.yaml`), que muestra probabilidad, decisión, banda de
-riesgo y factores SHAP. La página **Monitoreo** muestra predicciones
-registradas, tasa de rechazo, PSI por feature, AUC en vivo y si se
-disparará el reentrenamiento.
-
-### Informe de entrenamiento (Markdown + PDF)
-
-Cada `python -m src.ml.train` genera en `data/processed/reports/` un
-informe `.md` y un `.pdf` (con [`fpdf2`](https://pypi.org/project/fpdf2/),
-sin dependencias de sistema) con métricas train vs test, diagnóstico de
-ajuste, latencia y factores más influyentes. El párrafo narrativo usa una
-plantilla determinista; opcionalmente, con `ANTHROPIC_API_KEY` y
-`pip install anthropic`, lo redacta Claude (`claude-haiku-4-5` por defecto).
-
-### Variables de entorno (`.env`, ver `.env.example`)
-
-| Variable | Por defecto | Uso |
-|---|---|---|
-| `MODEL_PATH` | `data/processed/model.joblib` | Artefacto local del modelo (junto a él se guardan `imputation_values.json` y `reference_distribution.json`) |
-| `DECISION_THRESHOLD` | `0.5` en código, **0.16 recomendado** | Umbral de rechazo (sección 4.1) |
-| `MLFLOW_TRACKING_URI` | `file:./mlruns` | `databricks` en Databricks |
-| `MLFLOW_MODEL_URI` | vacío | p. ej. `models:/bcp_credit_champion/Production` para servir desde el registry |
-| `DRIFT_PSI_THRESHOLD` | `0.2` | PSI a partir del cual una feature tiene drift |
-| `PERFORMANCE_AUC_DROP_THRESHOLD` | `0.05` | Caída de AUC en vivo que dispara reentrenamiento |
-
-## 11. Pruebas, CI/CD y reproducibilidad
-
-```bash
-make test   # pytest: calidad de datos, API, gates MLOps, PSI, performance en vivo,
-            # benchmark, informe, roundtrip train->predict, toolkit estadístico
-make lint   # ruff check .
-```
-
-- `tests/test_train_predict.py` entrena un modelo real sobre una muestra y
-  predice con él (sin mocks), y verifica que un ingreso faltante se impute
-  con la mediana de entrenamiento.
-- `tests/test_stats.py` valida DeLong contra `sklearn`, que la corrección de
-  Nadeau-Bengio sea más conservadora que el t ingenuo, la calibración en
-  datos sintéticos perfectamente calibrados y la imputación sin fuga.
-- **CI** (`.github/workflows/ci-cd.yml`): ruff + pytest en cada push y PR.
-- **Reproducibilidad:** semilla 42 en split, folds, bootstrap y modelos;
-  `make evaluate` regenera todas las figuras y tablas (~7 min en una laptop;
-  `make evaluate-quick` ~1.5 min con CV 3x1).
-
-## 12. Referencias
-
-- DeLong, E. R., DeLong, D. M. y Clarke-Pearson, D. L. (1988). Comparing the areas under two or more correlated ROC curves: a nonparametric approach. *Biometrics*, 44(3), 837-845.
-- Sun, X. y Xu, W. (2014). Fast implementation of DeLong's algorithm for comparing the areas under correlated ROC curves. *IEEE Signal Processing Letters*, 21(11), 1389-1393.
+- DeLong, E. R., DeLong, D. M. y Clarke-Pearson, D. L. (1988). Comparing the areas under two or more correlated ROC curves. *Biometrics*, 44(3), 837-845.
+- Sun, X. y Xu, W. (2014). Fast implementation of DeLong's algorithm. *IEEE Signal Processing Letters*, 21(11), 1389-1393.
 - Nadeau, C. y Bengio, Y. (2003). Inference for the generalization error. *Machine Learning*, 52(3), 239-281.
-- Lundberg, S. M. y Lee, S.-I. (2017). A unified approach to interpreting model predictions. *NeurIPS*.
+- Holm, S. (1979). A simple sequentially rejective multiple test procedure. *Scandinavian Journal of Statistics*, 6(2), 65-70.
 - Siddiqi, N. (2017). *Intelligent Credit Scoring* (2.a ed.). Wiley.
-- Kreuzberger, D., Kühl, N. y Hirschl, S. (2023). Machine Learning Operations (MLOps): Overview, Definition, and Architecture. *IEEE Access*. arXiv:2205.02302.
-- Google Cloud. *MLOps: Continuous delivery and automation pipelines in machine learning*.
+- Lundberg, S. M. y Lee, S.-I. (2017). A unified approach to interpreting model predictions. *NeurIPS*.
+- Akiba, T. et al. (2019). Optuna: A next-generation hyperparameter optimization framework. *KDD*.
+- Kreuzberger, D., Kühl, N. y Hirschl, S. (2023). Machine Learning Operations (MLOps). *IEEE Access*. arXiv:2205.02302.
 
 ---
 
 **Autor:** Wilder Espinoza Luna · Estadística, UNMSM
 
-**Licencia de los datos:** el dataset "Give Me Some Credit" se distribuye
-bajo los términos de la competencia de Kaggle; revisa su licencia antes de
-redistribuirlo.
+**Licencia de los datos:** el dataset "Give Me Some Credit" se distribuye bajo los términos de la competencia de Kaggle; revisa su licencia antes de redistribuirlo.

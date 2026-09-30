@@ -38,3 +38,9 @@ fpdf2>=2.7.0
 # 8. Benchmark de modelos
 lightgbm>=4.0.0
 catboost>=1.2.0
+
+# 9. Optimización de hiperparámetros (CV anidada)
+optuna>=3.6.0
+
+# 10. Tests del toolkit estadístico (referencia de Holm)
+statsmodels>=0.14.0

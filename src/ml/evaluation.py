@@ -19,7 +19,7 @@ the statistical care a model-validation team expects:
 5. **Umbral de decisión** chosen on out-of-fold predictions (never on the
    holdout) by F1, Youden's J and expected misclassification cost.
 6. **Figuras** (PNG) + `metrics.json` + `evaluation_report.md` under
-   ``docs/`` so the README numbers are traceable to a single command.
+   ``reports/`` so the README numbers are traceable to a single command.
 
 Run with:
     python -m src.ml.evaluation            # full run (~5-10 min on a laptop)
@@ -199,8 +199,8 @@ def _bootstrap_panel(y: np.ndarray, p: np.ndarray, n_boot: int) -> dict[str, dic
 
 def run_evaluation(
     raw_data: pd.DataFrame,
-    output_dir: Path | str = "docs/results",
-    figures_dir: Path | str = "docs/images/results",
+    output_dir: Path | str = "reports",
+    figures_dir: Path | str = "reports/figures",
     n_splits: int = 5,
     n_repeats: int = 3,
     n_boot: int = 1000,
@@ -208,7 +208,12 @@ def run_evaluation(
     cost_fp: float = 1.0,
     algorithms: tuple[str, ...] = ALGORITHMS,
     make_figures: bool = True,
-) -> dict[str, Any]:
+    return_artifacts: bool = False,
+) -> dict[str, Any] | tuple[dict[str, Any], dict[str, Any]]:
+    """Ejecuta el protocolo completo. Con ``return_artifacts=True`` devuelve además
+    los modelos ajustados, los splits y las predicciones, para que los análisis
+    posteriores (scorecard, stress, equidad, SHAP) usen exactamente los mismos
+    objetos."""
     output_dir = Path(output_dir)
     figures_dir = Path(figures_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -350,6 +355,14 @@ def run_evaluation(
             fitted=fitted,
             x_dev_imp=x_dev_imp,
         )
+    if return_artifacts:
+        artifacts = {
+            "x_dev": x_dev, "x_test": x_test, "y_dev": y_dev, "y_test": y_test,
+            "x_dev_imp": x_dev_imp, "x_test_imp": x_test_imp, "imputation": imputation,
+            "fitted": fitted, "test_proba": test_proba, "oof": oof,
+            "per_fold": per_fold, "usable": usable, "n_fit": n_fit, "n_val": n_val,
+        }
+        return result, artifacts
     return result
 
 

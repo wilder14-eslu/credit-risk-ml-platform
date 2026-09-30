@@ -1,0 +1,30 @@
+# Escenarios de stress: ANÁLISIS DE ESCENARIOS, no pronóstico.
+# Los choques son supuestos ilustrativos elegidos por el analista; no están
+# calibrados con variables macroeconómicas ni con datos históricos de crisis.
+# Cada choque se aplica a una copia de las variables del holdout:
+#   multiply: multiplica la variable por el factor.
+#   delinquency_shock: fracción de solicitantes a los que se suma +1 al
+#     conteo de atrasos (elegidos al azar con la semilla indicada).
+seed: 42
+scenarios:
+  base:
+    description: "Sin choques (referencia)"
+    multiply: {}
+    delinquency_shock: {}
+  moderate_stress:
+    description: "Ingreso -10 %, utilización +15 %, endeudamiento +11 %, 5 % con un atraso adicional"
+    multiply:
+      monthly_income: 0.90
+      revolving_utilization_unsecured: 1.15
+      debt_ratio: 1.11
+    delinquency_shock:
+      number_of_time_30_59_days_past_due: 0.05
+  severe_stress:
+    description: "Ingreso -25 %, utilización +30 %, endeudamiento +33 %, 15 % con un atraso adicional"
+    multiply:
+      monthly_income: 0.75
+      revolving_utilization_unsecured: 1.30
+      debt_ratio: 1.33
+    delinquency_shock:
+      number_of_time_30_59_days_past_due: 0.15
+      number_of_time_60_89_days_past_due: 0.05

@@ -1,3 +1,3 @@
-from src.ml.validate_model import evaluate_and_promote
+from src.ml.validate_model import evaluate_candidate, promote_candidate
 
-__all__ = ["evaluate_and_promote"]
+__all__ = ["evaluate_candidate", "promote_candidate"]

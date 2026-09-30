@@ -159,5 +159,5 @@ with st.expander("Acerca del modelo"):
     )
     st.link_button(
         "Documentación API",
-        "http://127.0.0.1:8000/docs",
+        os.getenv("API_DOCS_URL", "https://credit-risk-api-mdix.onrender.com/docs"),
     )
